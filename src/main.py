@@ -11,13 +11,17 @@ from sklearn.metrics import (
     confusion_matrix,
     f1_score,
 )
-from sklearn.model_selection import train_test_split
 from sklearn.svm import LinearSVC
 
 
-INPUT_FILE = Path("../data/raw/data_train.xlsx")
-ENCODING_FIXED_FILE = Path("../data/processed/data_fixed_v2md.csv")
-CLEAN_DATA_FILE = Path("../data/processed/data_cleaned_v2md.csv")
+TRAIN_FILE = Path("../data/raw/data_train.xlsx")
+TEST_FILE = Path("../data/raw/data_test_fold1(in).csv")
+
+TRAIN_FIXED_FILE = Path("../data/processed/train_fixed_v2md.csv")
+TEST_FIXED_FILE = Path("../data/processed/test_fixed_v2md.csv")
+
+TRAIN_CLEAN_FILE = Path("../data/processed/train_cleaned_v2md.csv")
+TEST_CLEAN_FILE = Path("../data/processed/test_cleaned_v2md.csv")
 
 TEXT_COLUMN = "tweet_text"
 CLEAN_TEXT_COLUMN = "tweet_text_clean"
@@ -31,6 +35,11 @@ LABEL_COLUMN = "class"
 def load_excel_dataset(file_path: Path) -> pd.DataFrame:
     """Load dataset from an Excel file."""
     return pd.read_excel(file_path)
+
+
+def load_csv_dataset(file_path: Path) -> pd.DataFrame:
+    """Load dataset from a CSV file."""
+    return pd.read_csv(file_path)
 
 
 # =========================
@@ -108,15 +117,6 @@ def save_dataframe(df: pd.DataFrame, file_path: Path) -> None:
 # ML Pipeline
 # =========================
 
-def split_dataset(X, y, test_size: float = 0.2):
-    """Split dataset into train and test sets."""
-    return train_test_split(
-        X,
-        y,
-        test_size=test_size,
-        random_state=42,
-        stratify=y,
-    )
 
 
 
@@ -177,28 +177,39 @@ def evaluate_model(model, X_test, y_test) -> None:
 # =========================
 
 def main():
-    # Load raw dataset
-    df = load_excel_dataset(INPUT_FILE)
+    # Load datasets
+    train_df = load_excel_dataset(TRAIN_FILE)
+    test_df = load_csv_dataset(TEST_FILE)
 
     # Fix encoding issues
-    df_fixed = fix_dataframe_encoding(df)
-    save_dataframe(df_fixed, ENCODING_FIXED_FILE)
+    train_df_fixed = fix_dataframe_encoding(train_df)
+    test_df_fixed = fix_dataframe_encoding(test_df)
+
+    save_dataframe(train_df_fixed, TRAIN_FIXED_FILE)
+    save_dataframe(test_df_fixed, TEST_FIXED_FILE)
 
     # Apply text cleaning
-    df_clean = add_clean_text_column(
-        df_fixed,
+    train_df_clean = add_clean_text_column(
+        train_df_fixed,
         source_column=TEXT_COLUMN,
         target_column=CLEAN_TEXT_COLUMN,
     )
 
-    save_dataframe(df_clean, CLEAN_DATA_FILE)
+    test_df_clean = add_clean_text_column(
+        test_df_fixed,
+        source_column=TEXT_COLUMN,
+        target_column=CLEAN_TEXT_COLUMN,
+    )
+
+    save_dataframe(train_df_clean, TRAIN_CLEAN_FILE)
+    save_dataframe(test_df_clean, TEST_CLEAN_FILE)
 
     # Prepare ML data
-    X = df_clean[CLEAN_TEXT_COLUMN]
-    y = df_clean[LABEL_COLUMN]
+    X_train = train_df_clean[CLEAN_TEXT_COLUMN]
+    y_train = train_df_clean[LABEL_COLUMN]
 
-    # Split dataset
-    X_train, X_test, y_train, y_test = split_dataset(X, y)
+    X_test = test_df_clean[CLEAN_TEXT_COLUMN]
+    y_test = test_df_clean[LABEL_COLUMN]
 
     # TF-IDF
     vectorizer = build_vectorizer()
