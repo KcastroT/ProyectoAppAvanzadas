@@ -1,0 +1,6 @@
+from sklearn.svm import LinearSVC
+
+
+def build_model():
+    """Create Linear SVM model."""
+    return LinearSVC(C=1.0)
