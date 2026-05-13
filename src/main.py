@@ -1,3 +1,19 @@
+"""
+Main entry point for the NLP + Machine Learning pipeline.
+
+This module orchestrates the complete workflow for:
+- loading datasets
+- fixing encoding issues
+- preprocessing tweet text
+- vectorizing text using TF-IDF
+- training a machine learning classifier
+- evaluating model performance
+- analyzing predictions
+
+The current implementation uses:
+- TF-IDF for feature extraction
+- Linear SVM for classification
+"""
 from config import (
     CLEAN_TEXT_COLUMN,
     LABEL_COLUMN,
@@ -22,7 +38,9 @@ from data.preprocessing import (
 
 from data.saving import save_dataframe
 
-from evaluation.metrics import evaluate_model
+from evaluation.metrics import (
+    evaluate_model,
+)
 
 from features.vectorizer import (
     build_vectorizer,
@@ -31,20 +49,47 @@ from features.vectorizer import (
 
 from models.svm_model import build_model
 
+
 from evaluation.predictions import (
     build_results_dataframe,
     get_correct_predictions,
     get_incorrect_predictions,
 )
 
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+)
+
 def train_model(model, X_train, y_train):
-    """Train ML model."""
+    """Train a machine learning model using TF-IDF features.
+
+    Args:
+        model: Scikit-learn compatible classifier.
+        X_train: Vectorized training features.
+        y_train: Training labels.
+
+    Returns:
+        Trained machine learning model.
+    """
     model.fit(X_train, y_train)
 
     return model
 
 
 def main():
+    """Execute the complete NLP classification pipeline.
+
+    Workflow:
+        1. Load training and testing datasets.
+        2. Fix text encoding issues.
+        3. Clean and preprocess tweet text.
+        4. Save processed datasets.
+        5. Extract TF-IDF features.
+        6. Train the machine learning classifier.
+        7. Evaluate model performance.
+        8. Display correct and incorrect predictions.
+    """
 
     # =========================
     # Load datasets
@@ -123,6 +168,29 @@ def main():
     )
     
     # =========================
+    # Train Evaluation
+    # =========================
+
+    train_predictions = model.predict(
+        X_train_tfidf,
+    )
+
+    train_accuracy = accuracy_score(
+        y_train,
+        train_predictions,
+    )
+
+    train_f1 = f1_score(
+        y_train,
+        train_predictions,
+        average="weighted",
+    )
+
+    #print("\n=== Training Performance ===")
+    #print(f"Training Accuracy: {train_accuracy:.4f}")
+    #print(f"Training F1-score: {train_f1:.4f}")
+
+    # =========================
     # Evaluation
     # =========================
 
@@ -130,26 +198,26 @@ def main():
     print(f"Model: {model.__class__.__name__}")
 
     y_pred = evaluate_model(
-    model,
-    X_test_tfidf,
-    y_test
-)
+        model,
+        X_test_tfidf,
+        y_test,
+    )
     
     results_df = build_results_dataframe(
-    X_test,
-    y_test,
-    y_pred,
-)
+        X_test,
+        y_test,
+        y_pred,
+    )
     
     correct = get_correct_predictions(results_df)
 
     incorrect = get_incorrect_predictions(results_df)
 
     print("\n=== Correct Predictions ===")
-    print(correct.sample(5))
+    print(correct.sample(3))
 
     print("\n=== Incorrect Predictions ===")
-    print(incorrect.sample(5))
+    print(incorrect.sample(3))
 
 
 if __name__ == "__main__":
