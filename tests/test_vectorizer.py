@@ -13,7 +13,7 @@ class TestVectorizer(unittest.TestCase):
 
         self.assertEqual(
             vectorizer.max_features,
-            20000,
+            10000,
         )
 
     def test_vectorizer_fit_transform(self):

@@ -17,6 +17,7 @@ The current implementation uses:
 from config import (
     CLEAN_TEXT_COLUMN,
     LABEL_COLUMN,
+    RANDOM_STATE,
     TEST_CLEAN_FILE,
     TEST_FILE,
     TEST_FIXED_FILE,
@@ -24,6 +25,7 @@ from config import (
     TRAIN_CLEAN_FILE,
     TRAIN_FILE,
     TRAIN_FIXED_FILE,
+    VALIDATION_SIZE,
 )
 
 from data.loader import (
@@ -47,7 +49,8 @@ from features.vectorizer import (
     train_vectorizer,
 )
 
-from models.svm_model import build_model
+from sklearn.model_selection import train_test_split
+from models.random_forest_model import build_model
 
 
 from evaluation.predictions import (
@@ -135,9 +138,19 @@ def main():
     # Prepare ML data
     # =========================
 
-    X_train = train_df[CLEAN_TEXT_COLUMN]
+    X = train_df[CLEAN_TEXT_COLUMN]
 
-    y_train = train_df[LABEL_COLUMN]
+    y = train_df[LABEL_COLUMN]
+
+    X_train, X_validation, y_train, y_validation = (
+        train_test_split(
+            X,
+            y,
+            test_size=VALIDATION_SIZE,
+            random_state=RANDOM_STATE,
+            stratify=y,
+        )
+    )
 
     X_test = test_df[CLEAN_TEXT_COLUMN]
 
@@ -149,9 +162,15 @@ def main():
 
     vectorizer = build_vectorizer()
 
-    X_train_tfidf, X_test_tfidf = train_vectorizer(
-        vectorizer,
+    X_train_tfidf = vectorizer.fit_transform(
         X_train,
+    )
+
+    X_validation_tfidf = vectorizer.transform(
+        X_validation,
+    )
+
+    X_test_tfidf = vectorizer.transform(
         X_test,
     )
 
@@ -191,11 +210,25 @@ def main():
     #print(f"Training F1-score: {train_f1:.4f}")
 
     # =========================
+    # Validation Evaluation
+    # =========================
+
+    print("\n=== Validation Evaluation ===")
+
+    evaluate_model(
+        model,
+        X_validation_tfidf,
+        y_validation,
+    )
+
+    # =========================
     # Evaluation
     # =========================
 
     print("\n=== Model Information ===")
     print(f"Model: {model.__class__.__name__}")
+
+    print("\n=== External Test Evaluation ===")
 
     y_pred = evaluate_model(
         model,
@@ -213,11 +246,11 @@ def main():
 
     incorrect = get_incorrect_predictions(results_df)
 
-    print("\n=== Correct Predictions ===")
-    print(correct.sample(3))
+    #print("\n=== Correct Predictions ===")
+    #print(correct.sample(3))
 
-    print("\n=== Incorrect Predictions ===")
-    print(incorrect.sample(3))
+    #print("\n=== Incorrect Predictions ===")
+    #print(incorrect.sample(3))
 
 
 if __name__ == "__main__":

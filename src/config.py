@@ -20,3 +20,7 @@ TEST_CLEAN_FILE = Path("../data/processed/test_cleaned_v2md.csv")
 TEXT_COLUMN = "tweet_text"
 CLEAN_TEXT_COLUMN = "tweet_text_clean"
 LABEL_COLUMN = "class"
+
+VALIDATION_SIZE = 0.2
+
+RANDOM_STATE = 42
