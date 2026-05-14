@@ -50,7 +50,7 @@ from features.vectorizer import (
 )
 
 from sklearn.model_selection import train_test_split
-from models.random_forest_model import build_model
+from models.svm_model import build_model
 
 
 from evaluation.predictions import (
