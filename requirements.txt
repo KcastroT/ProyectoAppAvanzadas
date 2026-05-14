@@ -9,3 +9,4 @@ python-dateutil==2.9.0.post0
 six==1.17.0
 wasmtime==43.0.0
 wcwidth==0.6.0
+nltk
