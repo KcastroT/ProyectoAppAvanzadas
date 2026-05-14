@@ -1,5 +1,5 @@
 """
-Main entry point for the NLP + Machine Learning pipeline.
+Main entry point for the Machine Learning pipeline.
 
 This module orchestrates the complete workflow for:
 - loading datasets
@@ -14,6 +14,8 @@ The current implementation uses:
 - TF-IDF for feature extraction
 - Linear SVM for classification
 """
+
+# config.py
 from config import (
     CLEAN_TEXT_COLUMN,
     LABEL_COLUMN,
@@ -28,22 +30,33 @@ from config import (
     VALIDATION_SIZE,
 )
 
+# data/loading.py
 from data.loader import (
     load_csv_dataset,
     load_excel_dataset,
 )
 
+# data/saving.py
+from data.saving import save_dataframe
+
+# preprocessing.py
 from data.preprocessing import (
     add_clean_text_column,
     fix_dataframe_encoding,
 )
 
-from data.saving import save_dataframe
-
+# evaluation/metrics.py
 from evaluation.metrics import (
     evaluate_model,
 )
 
+from evaluation.predictions import (
+    build_results_dataframe,
+    get_correct_predictions,
+    get_incorrect_predictions,
+)
+
+# features/vectorizer.py
 from features.vectorizer import (
     build_vectorizer,
     train_vectorizer,
@@ -53,11 +66,7 @@ from sklearn.model_selection import train_test_split
 from models.svm_model import build_model
 
 
-from evaluation.predictions import (
-    build_results_dataframe,
-    get_correct_predictions,
-    get_incorrect_predictions,
-)
+
 
 from sklearn.metrics import (
     accuracy_score,
