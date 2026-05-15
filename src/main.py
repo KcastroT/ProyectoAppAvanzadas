@@ -20,11 +20,11 @@ from config import (
     CLEAN_TEXT_COLUMN,
     LABEL_COLUMN,
     RANDOM_STATE,
-    TEST_CLEAN_FILE,
+    CLEAN_FILE_TEST,
     TEST_FILE,
     TEST_FIXED_FILE,
     TEXT_COLUMN,
-    TRAIN_CLEAN_FILE,
+    CLEAN_FILE_TRAIN,
     TRAIN_FILE,
     TRAIN_FIXED_FILE,
     VALIDATION_SIZE,
@@ -42,6 +42,7 @@ from data.saving import save_dataframe
 # preprocessing.py
 from data.preprocessing import (
     add_clean_text_column,
+    clean_text,
     fix_dataframe_encoding,
 )
 
@@ -140,9 +141,9 @@ def main():
         target_column=CLEAN_TEXT_COLUMN,
     )
 
-    save_dataframe(train_df, TRAIN_CLEAN_FILE)
+    save_dataframe(train_df, CLEAN_FILE_TRAIN)
 
-    save_dataframe(test_df, TEST_CLEAN_FILE)
+    save_dataframe(test_df, CLEAN_FILE_TEST)
 
     # =========================
     # Prepare ML data
@@ -172,6 +173,8 @@ def main():
 
     vectorizer = build_vectorizer()
 
+    
+
     X_train_tfidf = vectorizer.fit_transform(
         X_train,
     )
@@ -184,6 +187,7 @@ def main():
         X_test,
     )
 
+    
     # =========================
     # Model
     # =========================
@@ -255,12 +259,12 @@ def main():
     correct = get_correct_predictions(results_df)
 
     incorrect = get_incorrect_predictions(results_df)
+    
+    print("\n=== Correct Predictions ===")
+    print(correct.sample(10))
 
-    #print("\n=== Correct Predictions ===")
-    #print(correct.sample(3))
-
-    #print("\n=== Incorrect Predictions ===")
-    #print(incorrect.sample(3))
+    print("\n=== Incorrect Predictions ===")
+    print(incorrect.sample(10))
 
 
 if __name__ == "__main__":

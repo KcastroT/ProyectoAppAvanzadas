@@ -10,8 +10,8 @@ TEST_FILE = Path("../data/raw/data_test_fold1(in).csv")
 TRAIN_FIXED_FILE = Path("../data/processed/train_fixed_v2md.csv")
 TEST_FIXED_FILE = Path("../data/processed/test_fixed_v2md.csv")
 
-TRAIN_CLEAN_FILE = Path("../data/processed/train_cleaned_v2md.csv")
-TEST_CLEAN_FILE = Path("../data/processed/test_cleaned_v2md.csv")
+CLEAN_FILE_TRAIN = Path("../data/processed/train_cleaned_v2md.csv")
+CLEAN_FILE_TEST = Path("../data/processed/test_cleaned_v2md.csv")
 
 # =========================
 # Dataset Columns
