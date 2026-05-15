@@ -1,35 +1,55 @@
+"""
+Main entry point for the Machine Learning pipeline.
+
+This module orchestrates the complete workflow for:
+- loading datasets
+- fixing encoding issues
+- preprocessing tweet text
+- vectorizing text using TF-IDF
+- training a machine learning classifier
+- evaluating model performance
+- analyzing predictions
+
+The current implementation uses:
+- TF-IDF for feature extraction
+- Linear SVM for classification
+"""
+
+# config.py
 from config import (
     CLEAN_TEXT_COLUMN,
     LABEL_COLUMN,
-    TEST_CLEAN_FILE,
+    RANDOM_STATE,
+    CLEAN_FILE_TEST,
     TEST_FILE,
     TEST_FIXED_FILE,
     TEXT_COLUMN,
-    TRAIN_CLEAN_FILE,
+    CLEAN_FILE_TRAIN,
     TRAIN_FILE,
     TRAIN_FIXED_FILE,
+    VALIDATION_SIZE,
 )
 
+# data/loading.py
 from data.loader import (
     load_csv_dataset,
     load_excel_dataset,
 )
 
+# data/saving.py
+from data.saving import save_dataframe
+
+# preprocessing.py
 from data.preprocessing import (
     add_clean_text_column,
+    clean_text,
     fix_dataframe_encoding,
 )
 
-from data.saving import save_dataframe
-
-from evaluation.metrics import evaluate_model
-
-from features.vectorizer import (
-    build_vectorizer,
-    train_vectorizer,
+# evaluation/metrics.py
+from evaluation.metrics import (
+    evaluate_model,
 )
-
-from models.svm_model import build_model
 
 from evaluation.predictions import (
     build_results_dataframe,
@@ -37,14 +57,53 @@ from evaluation.predictions import (
     get_incorrect_predictions,
 )
 
+# features/vectorizer.py
+from features.vectorizer import (
+    build_vectorizer,
+    train_vectorizer,
+)
+
+from sklearn.model_selection import train_test_split
+
+from models.svm_model import build_model
+
+
+
+
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+)
+
 def train_model(model, X_train, y_train):
-    """Train ML model."""
+    """Train a machine learning model using TF-IDF features.
+
+    Args:
+        model: Scikit-learn compatible classifier.
+        X_train: Vectorized training features.
+        y_train: Training labels.
+
+    Returns:
+        Trained machine learning model.
+    """
     model.fit(X_train, y_train)
 
     return model
 
 
 def main():
+    """Execute the complete NLP classification pipeline.
+
+    Workflow:
+        1. Load training and testing datasets.
+        2. Fix text encoding issues.
+        3. Clean and preprocess tweet text.
+        4. Save processed datasets.
+        5. Extract TF-IDF features.
+        6. Train the machine learning classifier.
+        7. Evaluate model performance.
+        8. Display correct and incorrect predictions.
+    """
 
     # =========================
     # Load datasets
@@ -82,17 +141,27 @@ def main():
         target_column=CLEAN_TEXT_COLUMN,
     )
 
-    save_dataframe(train_df, TRAIN_CLEAN_FILE)
+    save_dataframe(train_df, CLEAN_FILE_TRAIN)
 
-    save_dataframe(test_df, TEST_CLEAN_FILE)
+    save_dataframe(test_df, CLEAN_FILE_TEST)
 
     # =========================
     # Prepare ML data
     # =========================
 
-    X_train = train_df[CLEAN_TEXT_COLUMN]
+    X = train_df[CLEAN_TEXT_COLUMN]
 
-    y_train = train_df[LABEL_COLUMN]
+    y = train_df[LABEL_COLUMN]
+
+    X_train, X_validation, y_train, y_validation = (
+        train_test_split(
+            X,
+            y,
+            test_size=VALIDATION_SIZE,
+            random_state=RANDOM_STATE,
+            stratify=y,
+        )
+    )
 
     X_test = test_df[CLEAN_TEXT_COLUMN]
 
@@ -104,12 +173,21 @@ def main():
 
     vectorizer = build_vectorizer()
 
-    X_train_tfidf, X_test_tfidf = train_vectorizer(
-        vectorizer,
+    
+
+    X_train_tfidf = vectorizer.fit_transform(
         X_train,
+    )
+
+    X_validation_tfidf = vectorizer.transform(
+        X_validation,
+    )
+
+    X_test_tfidf = vectorizer.transform(
         X_test,
     )
 
+    
     # =========================
     # Model
     # =========================
@@ -123,33 +201,70 @@ def main():
     )
     
     # =========================
+    # Train Evaluation
+    # =========================
+
+    train_predictions = model.predict(
+        X_train_tfidf,
+    )
+
+    train_accuracy = accuracy_score(
+        y_train,
+        train_predictions,
+    )
+
+    train_f1 = f1_score(
+        y_train,
+        train_predictions,
+        average="weighted",
+    )
+
+    #print("\n=== Training Performance ===")
+    #print(f"Training Accuracy: {train_accuracy:.4f}")
+    #print(f"Training F1-score: {train_f1:.4f}")
+
+    # =========================
+    # Validation Evaluation
+    # =========================
+
+    print("\n=== Validation Evaluation ===")
+
+    evaluate_model(
+        model,
+        X_validation_tfidf,
+        y_validation,
+    )
+
+    # =========================
     # Evaluation
     # =========================
 
     print("\n=== Model Information ===")
     print(f"Model: {model.__class__.__name__}")
 
+    print("\n=== External Test Evaluation ===")
+
     y_pred = evaluate_model(
-    model,
-    X_test_tfidf,
-    y_test
-)
+        model,
+        X_test_tfidf,
+        y_test,
+    )
     
     results_df = build_results_dataframe(
-    X_test,
-    y_test,
-    y_pred,
-)
+        X_test,
+        y_test,
+        y_pred,
+    )
     
     correct = get_correct_predictions(results_df)
 
     incorrect = get_incorrect_predictions(results_df)
-
+    
     print("\n=== Correct Predictions ===")
-    print(correct.sample(5))
+    print(correct.sample(10))
 
     print("\n=== Incorrect Predictions ===")
-    print(incorrect.sample(5))
+    print(incorrect.sample(10))
 
 
 if __name__ == "__main__":

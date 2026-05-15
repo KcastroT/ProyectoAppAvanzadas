@@ -5,9 +5,10 @@ def build_vectorizer():
     """Create TF-IDF vectorizer."""
     return TfidfVectorizer(
         analyzer="char_wb",
-        max_features=20000,
-        ngram_range=(1, 2),
-        min_df=2,
+        max_features=10000,
+        ngram_range=(3,5),
+        min_df=5,
+        max_df=0.95,
         sublinear_tf=True,
     )
 

@@ -1,8 +1,10 @@
 import re
+import nltk
 from typing import Dict
 
 import ftfy
 import pandas as pd
+from nltk.stem.snowball import SnowballStemmer
 
 
 SLANG_MAP: Dict[str, str] = {
@@ -64,6 +66,13 @@ SLANG_MAP: Dict[str, str] = {
 
 
 # =========================
+# Stemmer
+# =========================
+
+stemmer = SnowballStemmer("spanish")
+
+
+# =========================
 # Encoding
 # =========================
 
@@ -105,6 +114,19 @@ def normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def apply_stemming(text: str) -> str:
+    """Apply stemming using Snowball Stemmer."""
+
+    words = text.split()
+
+    stemmed_words = [
+        stemmer.stem(word)
+        for word in words
+    ]
+
+    return " ".join(stemmed_words)
+
+
 def expand_slang(text: str, slang_map: Dict[str, str]) -> str:
     words = text.split()
 
@@ -142,6 +164,8 @@ def clean_text(text: str) -> str:
         text = step(text)
 
     text = expand_slang(text, SLANG_MAP)
+
+    #text = apply_stemming(text)
 
     return text
 
