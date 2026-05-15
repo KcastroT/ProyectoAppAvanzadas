@@ -3,27 +3,8 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix,
     f1_score,
+    roc_auc_score
 )
-
-
-def calculate_auc_custom(TP, FP, FN, TN):
-    """
-    Calcula AUC usando la fórmula especificada:
-    AUC = (1 + TPR - FPR) / 2
-    
-    Donde:
-    - TPR = TP / (TP + FN)  [True Positive Rate / Sensibilidad]
-    - FPR = FP / (FP + TN)  [False Positive Rate]
-    """
-    if (TP + FN) == 0 or (FP + TN) == 0:
-        return None
-    
-    TPR = TP / (TP + FN)
-    FPR = FP / (FP + TN)
-    
-    auc = (1 + TPR - FPR) / 2
-    
-    return auc
 
 
 def evaluate_model(model, X_test, y_test):
@@ -31,7 +12,7 @@ def evaluate_model(model, X_test, y_test):
     y_pred = model.predict(X_test)
 
     # =========================
-    # AUC usando fórmula especificada
+    # AUC Support for Multiple Models
     # =========================
 
     auc = None
@@ -42,13 +23,25 @@ def evaluate_model(model, X_test, y_test):
         y_test == positive_class
     ).astype(int)
 
-    # Calcular matriz de confusión manualmente
-    TP = sum((y_pred == 1) & (y_test_binary == 1))
-    FP = sum((y_pred == 1) & (y_test_binary == 0))
-    TN = sum((y_pred == 0) & (y_test_binary == 0))
-    FN = sum((y_pred == 0) & (y_test_binary == 1))
+    if hasattr(model, "decision_function"):
 
-    auc = calculate_auc_custom(TP, FP, FN, TN)
+        decision_scores = model.decision_function(X_test)
+
+        auc = roc_auc_score(
+            y_test_binary,
+            decision_scores,
+        )
+
+    elif hasattr(model, "predict_proba"):
+
+        probabilities = model.predict_proba(X_test)
+
+        positive_scores = probabilities[:, 1]
+
+        auc = roc_auc_score(
+            y_test_binary,
+            positive_scores,
+        )
 
     accuracy = accuracy_score(y_test, y_pred)
 
