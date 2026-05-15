@@ -42,7 +42,6 @@ from data.saving import save_dataframe
 # preprocessing.py
 from data.preprocessing import (
     add_clean_text_column,
-    clean_text,
     fix_dataframe_encoding,
 )
 
@@ -59,11 +58,13 @@ from evaluation.predictions import (
 
 # features/vectorizer.py
 from features.vectorizer import (
-    build_vectorizer,
-    train_vectorizer,
+    build_vectorizer
 )
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import (
+    train_test_split,
+    cross_val_score
+)
 
 from models.svm_model import build_model
 
@@ -201,6 +202,33 @@ def main():
     )
     
     # =========================
+    # K-Fold Cross Validation
+    # =========================
+
+    cv_scores = cross_val_score(
+        model,
+        X_train_tfidf,
+        y_train,
+        cv=5,
+        scoring="f1_weighted",
+    )
+
+    print("\n=== 5-Fold Cross Validation ===")
+
+    for idx, score in enumerate(cv_scores, start=1):
+        print(f"Fold {idx}: {score:.4f}")
+
+    print(
+        f"\nAverage CV F1-score: "
+        f"{cv_scores.mean():.4f}"
+    )
+
+    print(
+        f"CV Standard Deviation: "
+        f"{cv_scores.std():.4f}"
+    )
+
+    # =========================
     # Train Evaluation
     # =========================
 
@@ -219,9 +247,7 @@ def main():
         average="weighted",
     )
 
-    #print("\n=== Training Performance ===")
-    #print(f"Training Accuracy: {train_accuracy:.4f}")
-    #print(f"Training F1-score: {train_f1:.4f}")
+    
 
     # =========================
     # Validation Evaluation

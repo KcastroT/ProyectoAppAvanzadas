@@ -1,11 +1,12 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
+
 def build_vectorizer():
     """Create TF-IDF vectorizer."""
     return TfidfVectorizer(
         analyzer="char_wb",
-        max_features=10000,
+        max_features=2000,
         ngram_range=(3,5),
         min_df=5,
         max_df=0.95,
