@@ -71,21 +71,35 @@ SLANG_MAP: Dict[str, str] = {
 
 stemmer = SnowballStemmer("spanish")
 
-
 # =========================
 # Encoding
 # =========================
 
 def fix_encoding(text: str) -> str:
-    """Fix encoding issues using ftfy."""
+    """
+    Fix encoding issues in a given text using ftfy.
+
+    Args:
+        text (str): The input text to fix.
+
+    Returns:
+        str: The text with encoding issues fixed.
+    """
     if isinstance(text, str):
         return ftfy.fix_text(text)
 
     return text
 
-
 def fix_dataframe_encoding(df: pd.DataFrame) -> pd.DataFrame:
-    """Fix encoding for all object columns."""
+    """
+    Fix encoding issues for all object columns in a DataFrame.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+
+    Returns:
+        pd.DataFrame: A copy of the DataFrame with fixed encoding.
+    """
     df_copy = df.copy()
 
     for col in df_copy.select_dtypes(include="object").columns:
@@ -93,30 +107,68 @@ def fix_dataframe_encoding(df: pd.DataFrame) -> pd.DataFrame:
 
     return df_copy
 
-
 # =========================
 # Text Cleaning Helpers
 # =========================
 
 def remove_urls(text: str) -> str:
+    """
+    Remove URLs from the given text.
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        str: The text without URLs.
+    """
     return re.sub(r"http\S+|www\S+", "", text)
 
-
 def remove_mentions(text: str) -> str:
+    """
+    Remove mentions (e.g., @username) from the given text.
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        str: The text without mentions.
+    """
     return re.sub(r"@\w+", "", text)
 
-
 def normalize_hashtags(text: str) -> str:
+    """
+    Normalize hashtags by removing the '#' symbol.
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        str: The text with normalized hashtags.
+    """
     return re.sub(r"#(\w+)", r"\1", text)
 
-
 def normalize_whitespace(text: str) -> str:
+    """
+    Normalize whitespace in the given text by replacing multiple spaces with a single space.
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        str: The text with normalized whitespace.
+    """
     return re.sub(r"\s+", " ", text).strip()
 
-
 def apply_stemming(text: str) -> str:
-    """Apply stemming using Snowball Stemmer."""
+    """
+    Apply stemming to the words in the given text using Snowball Stemmer.
 
+    Args:
+        text (str): The input text.
+
+    Returns:
+        str: The text with stemmed words.
+    """
     words = text.split()
 
     stemmed_words = [
@@ -126,8 +178,17 @@ def apply_stemming(text: str) -> str:
 
     return " ".join(stemmed_words)
 
-
 def expand_slang(text: str, slang_map: Dict[str, str]) -> str:
+    """
+    Replace slang words in the text with their expanded forms using a slang map.
+
+    Args:
+        text (str): The input text.
+        slang_map (Dict[str, str]): A dictionary mapping slang words to their expanded forms.
+
+    Returns:
+        str: The text with slang words expanded.
+    """
     words = text.split()
 
     normalized_words = []
@@ -141,13 +202,29 @@ def expand_slang(text: str, slang_map: Dict[str, str]) -> str:
 
     return " ".join(normalized_words)
 
-
 # =========================
 # Main Cleaning Pipeline
 # =========================
 
 def clean_text(text: str) -> str:
-    """Apply NLP preprocessing pipeline."""
+    """
+    Apply a series of NLP preprocessing steps to clean the given text.
+
+    Steps include:
+        - Lowercasing
+        - Removing URLs
+        - Removing mentions
+        - Normalizing hashtags
+        - Normalizing whitespace
+        - Expanding slang
+        - Applying stemming
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        str: The cleaned text.
+    """
     if not isinstance(text, str):
         return text
 
@@ -169,13 +246,22 @@ def clean_text(text: str) -> str:
 
     return text
 
-
 def add_clean_text_column(
     df: pd.DataFrame,
     source_column: str,
     target_column: str,
 ) -> pd.DataFrame:
-    """Create cleaned text column."""
+    """
+    Add a new column to the DataFrame with cleaned text.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        source_column (str): The name of the column containing the original text.
+        target_column (str): The name of the new column to store the cleaned text.
+
+    Returns:
+        pd.DataFrame: A copy of the DataFrame with the new cleaned text column.
+    """
     df_copy = df.copy()
 
     df_copy[target_column] = df_copy[source_column].apply(clean_text)
