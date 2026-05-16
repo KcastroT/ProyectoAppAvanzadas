@@ -9,9 +9,19 @@ from src.data.loader import (
 
 
 class TestLoader(unittest.TestCase):
-
+    """
+    Unit tests for dataset loading utilities.
+    """
+    
     def test_load_csv_dataset(self):
+        """
+        Verify that a CSV dataset is successfully loaded into a DataFrame.
 
+        The test creates a temporary CSV file, loads it using
+        ``load_csv_dataset()``, checks that the resulting DataFrame is not
+        empty, and then removes the temporary file.
+        """
+        
         sample_path = Path("temp_test.csv")
 
         df = pd.DataFrame({

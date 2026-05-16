@@ -10,9 +10,15 @@ from src.data.preprocessing import (
 
 
 class TestPreprocessing(unittest.TestCase):
-
+    """
+    Unit tests for text preprocessing utility functions.
+    """
+    
     def test_remove_urls(self):
-
+        """
+        Verify that URLs are removed from text strings.
+        """
+        
         text = "hello http://google.com"
 
         result = remove_urls(text)
@@ -20,6 +26,9 @@ class TestPreprocessing(unittest.TestCase):
         self.assertNotIn("http", result)
 
     def test_remove_mentions(self):
+        """
+        Verify that user mentions are removed from text strings.
+        """
 
         text = "@kevin hello"
 
@@ -28,7 +37,10 @@ class TestPreprocessing(unittest.TestCase):
         self.assertNotIn("@kevin", result)
 
     def test_normalize_hashtags(self):
-
+        """
+        Verify that hashtags are normalized by removing the ``#`` symbol.
+        """
+        
         text = "#thinspo"
 
         result = normalize_hashtags(text)
@@ -36,7 +48,11 @@ class TestPreprocessing(unittest.TestCase):
         self.assertEqual(result, "thinspo")
 
     def test_normalize_whitespace(self):
-
+        """
+        Verify that multiple whitespace characters are reduced
+        to single spaces.
+        """
+        
         text = "hello     world"
 
         result = normalize_whitespace(text)
@@ -44,7 +60,10 @@ class TestPreprocessing(unittest.TestCase):
         self.assertEqual(result, "hello world")
 
     def test_clean_text_lowercase(self):
-
+        """
+        Verify that text is converted to lowercase during cleaning.
+        """
+        
         text = "HELLO WORLD"
 
         result = clean_text(text)
@@ -52,7 +71,10 @@ class TestPreprocessing(unittest.TestCase):
         self.assertEqual(result, "hello world")
 
     def test_clean_text_none(self):
-
+        """
+        Verify that ``clean_text`` returns ``None`` when the input is ``None``.
+        """
+        
         result = clean_text(None)
 
         self.assertIsNone(result)

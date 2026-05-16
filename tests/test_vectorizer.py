@@ -6,9 +6,16 @@ from src.features.vectorizer import (
 
 
 class TestVectorizer(unittest.TestCase):
-
+    """
+    Unit tests for TF-IDF vectorizer utilities.
+    """
+    
     def test_build_vectorizer(self):
-
+        """
+        Verify that the vectorizer is created with the expected
+        maximum number of features.
+        """
+        
         vectorizer = build_vectorizer()
 
         self.assertEqual(
@@ -17,7 +24,14 @@ class TestVectorizer(unittest.TestCase):
         )
 
     def test_vectorizer_fit_transform(self):
+        """
+        Verify that the vectorizer can fit training data
+        and transform both training and test datasets.
 
+        The test checks that the resulting TF-IDF matrices
+        have the expected number of rows.
+        """
+        
         vectorizer = build_vectorizer()
 
         X_train = [
