@@ -15,6 +15,8 @@ The current implementation uses:
 - Linear SVM for classification
 """
 
+import numpy as np
+
 # config.py
 from config import (
     CLEAN_TEXT_COLUMN,
@@ -188,7 +190,30 @@ def main():
         X_test,
     )
 
-    
+    # =========================
+    # TF-IDF Token Samples
+    # =========================
+
+    feature_names = vectorizer.get_feature_names_out()
+
+    print("\n=== TF-IDF Vocabulary ===")
+    print(f"Vocabulary size: {len(feature_names)}")
+
+    sample_size = min(20, len(feature_names))
+
+    rng = np.random.default_rng(RANDOM_STATE)
+
+    sample_indices = rng.choice(
+        len(feature_names),
+        size=sample_size,
+        replace=False,
+    )
+
+    print(f"\nRandom sample of {sample_size} tokens:")
+
+    for idx in sample_indices:
+        print(f"  - {feature_names[idx]}")
+
     # =========================
     # Model
     # =========================
@@ -236,16 +261,7 @@ def main():
         X_train_tfidf,
     )
 
-    train_accuracy = accuracy_score(
-        y_train,
-        train_predictions,
-    )
-
-    train_f1 = f1_score(
-        y_train,
-        train_predictions,
-        average="weighted",
-    )
+    
 
     
 
@@ -286,11 +302,11 @@ def main():
 
     incorrect = get_incorrect_predictions(results_df)
     
-    print("\n=== Correct Predictions ===")
-    print(correct.sample(10))
+    # print("\n=== Correct Predictions ===")
+    # print(correct.sample(10))
 
-    print("\n=== Incorrect Predictions ===")
-    print(incorrect.sample(10))
+    # print("\n=== Incorrect Predictions ===")
+    # print(incorrect.sample(10))
 
 
 if __name__ == "__main__":

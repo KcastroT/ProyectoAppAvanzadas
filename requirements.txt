@@ -1,12 +1,33 @@
-Arpeggio==2.0.3
-et_xmlfile==2.0.0
-ftfy==6.3.1
-numpy==2.4.4
-openpyxl==3.1.5
-packaging==26.0
+# Requires Python 3.14.3
+# Install: pip install -r requirements.txt
+
+# --- Data handling ---
 pandas==3.0.2
+numpy==2.4.4
 python-dateutil==2.9.0.post0
 six==1.17.0
-wasmtime==43.0.0
+packaging==26.0
+
+# --- Excel I/O (pandas.read_excel) ---
+openpyxl==3.1.5
+et_xmlfile==2.0.0
+
+# --- Text encoding / cleaning ---
+ftfy==6.3.1
 wcwidth==0.6.0
-nltk
+
+# --- NLP (Snowball stemmer) ---
+nltk==3.9.4
+regex==2026.5.9
+click==8.3.3
+tqdm==4.67.3
+
+# --- Machine learning ---
+scikit-learn==1.8.0
+scipy==1.17.1
+joblib==1.5.3
+threadpoolctl==3.6.0
+
+# --- Other transitive deps ---
+Arpeggio==2.0.3
+wasmtime==43.0.0
