@@ -19,13 +19,18 @@ import numpy as np
 
 # config.py
 from config import (
+    BETO_BATCH_SIZE,
+    BETO_MAX_LENGTH,
+    BETO_MODEL_NAME,
     CLEAN_TEXT_COLUMN,
+    FEATURE_METHOD,
     LABEL_COLUMN,
     RANDOM_STATE,
     CLEAN_FILE_TEST,
     TEST_FILE,
     TEST_FIXED_FILE,
     TEXT_COLUMN,
+    TRANSFORMER_TEXT_COLUMN,
     CLEAN_FILE_TRAIN,
     TRAIN_FILE,
     TRAIN_FIXED_FILE,
@@ -44,6 +49,7 @@ from data.saving import save_dataframe
 # preprocessing.py
 from data.preprocessing import (
     add_clean_text_column,
+    clean_text_light,
     fix_dataframe_encoding,
 )
 
@@ -63,10 +69,19 @@ from features.vectorizer import (
     build_vectorizer
 )
 
+# features/embeddings.py
+from features.embeddings import (
+    build_embedder
+)
+
 from sklearn.model_selection import (
     train_test_split,
     cross_val_score
 )
+
+from sklearn.pipeline import make_pipeline
+
+from sklearn.preprocessing import StandardScaler
 
 from models.svm_model import build_model
 
@@ -149,10 +164,37 @@ def main():
     save_dataframe(test_df, CLEAN_FILE_TEST)
 
     # =========================
+    # Transformer text (BETO)
+    # =========================
+    #
+    # BETO is a *cased* subword model, so it works better on lightly cleaned
+    # text (case and accents preserved, no stemming) than on the aggressively
+    # normalized TF-IDF column.
+
+    if FEATURE_METHOD == "beto":
+        train_df = add_clean_text_column(
+            train_df,
+            source_column=TEXT_COLUMN,
+            target_column=TRANSFORMER_TEXT_COLUMN,
+            cleaner=clean_text_light,
+        )
+
+        test_df = add_clean_text_column(
+            test_df,
+            source_column=TEXT_COLUMN,
+            target_column=TRANSFORMER_TEXT_COLUMN,
+            cleaner=clean_text_light,
+        )
+
+        text_column = TRANSFORMER_TEXT_COLUMN
+    else:
+        text_column = CLEAN_TEXT_COLUMN
+
+    # =========================
     # Prepare ML data
     # =========================
 
-    X = train_df[CLEAN_TEXT_COLUMN]
+    X = train_df[text_column]
 
     y = train_df[LABEL_COLUMN]
 
@@ -166,63 +208,79 @@ def main():
         )
     )
 
-    X_test = test_df[CLEAN_TEXT_COLUMN]
+    X_test = test_df[text_column]
 
     y_test = test_df[LABEL_COLUMN]
 
     # =========================
-    # TF-IDF
+    # Feature extraction
     # =========================
 
-    vectorizer = build_vectorizer()
+    print(f"\n=== Feature Method: {FEATURE_METHOD} ===")
 
-    
+    if FEATURE_METHOD == "beto":
+        embedder = build_embedder(
+            model_name=BETO_MODEL_NAME,
+            max_length=BETO_MAX_LENGTH,
+            batch_size=BETO_BATCH_SIZE,
+        )
 
-    X_train_tfidf = vectorizer.fit_transform(
-        X_train,
-    )
+        print(f"Encoding with {BETO_MODEL_NAME} on {embedder.device} ...")
 
-    X_validation_tfidf = vectorizer.transform(
-        X_validation,
-    )
+        X_train_features = embedder.transform(X_train)
 
-    X_test_tfidf = vectorizer.transform(
-        X_test,
-    )
+        X_validation_features = embedder.transform(X_validation)
 
-    # =========================
-    # TF-IDF Token Samples
-    # =========================
+        X_test_features = embedder.transform(X_test)
 
-    feature_names = vectorizer.get_feature_names_out()
+        print(
+            f"Embedding shape: {X_train_features.shape} "
+            f"(samples x hidden_size)"
+        )
 
-    print("\n=== TF-IDF Vocabulary ===")
-    print(f"Vocabulary size: {len(feature_names)}")
+        # Standardize dense embeddings before the linear SVM.
+        model = make_pipeline(
+            StandardScaler(),
+            build_model(),
+        )
+    else:
+        vectorizer = build_vectorizer()
 
-    sample_size = min(20, len(feature_names))
+        X_train_features = vectorizer.fit_transform(X_train)
 
-    rng = np.random.default_rng(RANDOM_STATE)
+        X_validation_features = vectorizer.transform(X_validation)
 
-    sample_indices = rng.choice(
-        len(feature_names),
-        size=sample_size,
-        replace=False,
-    )
+        X_test_features = vectorizer.transform(X_test)
 
-    print(f"\nRandom sample of {sample_size} tokens:")
+        feature_names = vectorizer.get_feature_names_out()
 
-    for idx in sample_indices:
-        print(f"  - {feature_names[idx]}")
+        print("\n=== TF-IDF Vocabulary ===")
+        print(f"Vocabulary size: {len(feature_names)}")
+
+        sample_size = min(20, len(feature_names))
+
+        rng = np.random.default_rng(RANDOM_STATE)
+
+        sample_indices = rng.choice(
+            len(feature_names),
+            size=sample_size,
+            replace=False,
+        )
+
+        print(f"\nRandom sample of {sample_size} tokens:")
+
+        for idx in sample_indices:
+            print(f"  - {feature_names[idx]}")
+
+        model = build_model()
 
     # =========================
     # Model
     # =========================
 
-    model = build_model()
-
     model = train_model(
         model,
-        X_train_tfidf,
+        X_train_features,
         y_train,
     )
     
@@ -232,7 +290,7 @@ def main():
 
     cv_scores = cross_val_score(
         model,
-        X_train_tfidf,
+        X_train_features,
         y_train,
         cv=5,
         scoring="f1_weighted",
@@ -257,12 +315,6 @@ def main():
     # Train Evaluation
     # =========================
 
-    train_predictions = model.predict(
-        X_train_tfidf,
-    )
-
-    
-
     
 
     # =========================
@@ -273,7 +325,7 @@ def main():
 
     evaluate_model(
         model,
-        X_validation_tfidf,
+        X_validation_features,
         y_validation,
     )
 
@@ -288,7 +340,7 @@ def main():
 
     y_pred = evaluate_model(
         model,
-        X_test_tfidf,
+        X_test_features,
         y_test,
     )
     

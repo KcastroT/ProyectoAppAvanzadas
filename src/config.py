@@ -19,8 +19,24 @@ CLEAN_FILE_TEST = Path("../data/processed/test_cleaned_v2md.csv")
 
 TEXT_COLUMN = "tweet_text"
 CLEAN_TEXT_COLUMN = "tweet_text_clean"
+TRANSFORMER_TEXT_COLUMN = "tweet_text_transformer"
 LABEL_COLUMN = "class"
 
 VALIDATION_SIZE = 0.2
 
 RANDOM_STATE = 42
+
+# =========================
+# Feature Extraction
+# =========================
+
+# Which representation feeds the classifier: "tfidf" or "beto".
+FEATURE_METHOD = "beto"
+
+# =========================
+# BETO Transformer (Spanish BERT)
+# =========================
+
+BETO_MODEL_NAME = "dccuchile/bert-base-spanish-wwm-cased"
+BETO_MAX_LENGTH = 128
+BETO_BATCH_SIZE = 32

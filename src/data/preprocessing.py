@@ -135,7 +135,7 @@ def expand_slang(text: str, slang_map: Dict[str, str]) -> str:
     for word in words:
         cleaned_word = re.sub(r"[^\w]", "", word)
 
-        replacement = slang_map.get(cleaned_word, word)
+        replacement = slang_map.get(cleaned_word.lower(), word)
 
         normalized_words.append(replacement)
 
@@ -165,20 +165,47 @@ def clean_text(text: str) -> str:
 
     text = expand_slang(text, SLANG_MAP)
 
-    text = apply_stemming(text)
+    #text = apply_stemming(text)
 
     return text
 
+
+
+def clean_text_light(text: str) -> str:
+    """Lighter cleaning pipeline for transformer models (e.g. BETO).
+
+    Unlike :func:`clean_text`, this keeps the original casing and accents and
+    skips stemming, since cased subword models lose information when the text
+    is lowercased or stemmed. It still removes noise (URLs, mentions, hashtag
+    symbols, extra whitespace) and expands slang.
+    """
+    if not isinstance(text, str):
+        return text
+
+    preprocessing_steps = [
+        remove_urls,
+        remove_mentions,
+        normalize_hashtags,
+        normalize_whitespace,
+    ]
+
+    for step in preprocessing_steps:
+        text = step(text)
+
+    text = expand_slang(text, SLANG_MAP)
+
+    return text
 
 
 def add_clean_text_column(
     df: pd.DataFrame,
     source_column: str,
     target_column: str,
+    cleaner=clean_text,
 ) -> pd.DataFrame:
-    """Create cleaned text column."""
+    """Create cleaned text column using the given cleaning function."""
     df_copy = df.copy()
 
-    df_copy[target_column] = df_copy[source_column].apply(clean_text)
+    df_copy[target_column] = df_copy[source_column].apply(cleaner)
 
     return df_copy
