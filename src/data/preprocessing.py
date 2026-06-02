@@ -1,7 +1,5 @@
 import re
-import nltk
 from typing import Dict
-
 import ftfy
 import pandas as pd
 from nltk.stem.snowball import SnowballStemmer
@@ -165,7 +163,7 @@ def clean_text(text: str) -> str:
 
     text = expand_slang(text, SLANG_MAP)
 
-    #text = apply_stemming(text)
+    text = apply_stemming(text)
 
     return text
 
