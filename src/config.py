@@ -5,7 +5,7 @@ from pathlib import Path
 # =========================
 
 TRAIN_FILE = Path("../data/raw/data_train.xlsx")
-TEST_FILE = Path("../data/raw/data_test_fold1(in).csv")
+TEST_FILE = Path("../data/raw/data_test_combined.csv")
 
 TRAIN_FIXED_FILE = Path("../data/processed/train_fixed_v2md.csv")
 TEST_FIXED_FILE = Path("../data/processed/test_fixed_v2md.csv")
