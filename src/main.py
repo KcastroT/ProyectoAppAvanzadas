@@ -31,6 +31,9 @@ from config import (
     CLEAN_TEXT_COLUMN,
     FEATURE_METHOD,
     LABEL_COLUMN,
+    LLM_LABELS,
+    LLM_MODEL_NAME,
+    LLM_N_FEW_SHOT,
     RANDOM_STATE,
     CLEAN_FILE_TEST,
     TEST_FILE,
@@ -97,6 +100,10 @@ from models.random_forest_model import (
 
 from models.beto_finetune import (
     build_model as build_beto_finetune_model,
+)
+
+from models.llm import (
+    build_model as build_llm_model,
 )
 
 from evaluation.compare import (
@@ -192,7 +199,7 @@ def main():
     # text (case and accents preserved, no stemming) than on the aggressively
     # normalized TF-IDF column.
 
-    if FEATURE_METHOD in ("beto", "beto_finetune", "grid"):
+    if FEATURE_METHOD in ("beto", "beto_finetune", "grid", "llm"):
         train_df = add_clean_text_column(
             train_df,
             source_column=TEXT_COLUMN,
@@ -209,7 +216,7 @@ def main():
 
     if FEATURE_METHOD == "grid":
         text_column = None  # grid mode pulls both columns directly below
-    elif FEATURE_METHOD in ("beto", "beto_finetune"):
+    elif FEATURE_METHOD in ("beto", "beto_finetune", "llm"):
         text_column = TRANSFORMER_TEXT_COLUMN
     else:
         text_column = CLEAN_TEXT_COLUMN
@@ -458,6 +465,43 @@ def main():
             results,
             title="Classifier Comparison (frozen BETO embeddings)",
         )
+
+        return
+    elif FEATURE_METHOD == "llm":
+        # Local LLM (Ollama) zero-/few-shot baseline. Each prediction is an
+        # LLM call, so we skip K-fold CV (it would mean thousands of calls)
+        # and evaluate directly on validation + test. The model emits a label,
+        # not a probability, so AUC is not available.
+        shot_kind = (
+            f"{LLM_N_FEW_SHOT}-shot per class"
+            if LLM_N_FEW_SHOT > 0
+            else "zero-shot"
+        )
+
+        print(
+            f"\nClassifying with LLM '{LLM_MODEL_NAME}' via Ollama "
+            f"({shot_kind}) ..."
+        )
+
+        model = build_llm_model(
+            model_name=LLM_MODEL_NAME,
+            labels=LLM_LABELS,
+            n_few_shot=LLM_N_FEW_SHOT,
+        )
+
+        # "Training" only records labels and samples few-shot examples.
+        model.fit(X_train, y_train)
+
+        print("\n=== Validation Evaluation ===")
+
+        evaluate_model(model, X_validation, y_validation)
+
+        print("\n=== Model Information ===")
+        print(f"Model: {LLM_MODEL_NAME} (Ollama, {shot_kind})")
+
+        print("\n=== External Test Evaluation ===")
+
+        evaluate_model(model, X_test, y_test)
 
         return
     else:
