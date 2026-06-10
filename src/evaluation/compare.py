@@ -179,6 +179,41 @@ def print_comparison_grid(results, title="Comparison Grid"):
     print("=" * width)
 
 
+def print_llm_comparison(results, title="LLM Comparison"):
+    """Print a compact table comparing LLMs on validation + test.
+
+    LLMs emit a label (not a score) and we skip CV for them, so this table
+    omits CV / AUC columns. Each result dict needs ``name`` plus ``val`` and
+    ``test`` metric dicts (with ``accuracy`` and ``f1``).
+    """
+    width = 74
+
+    print()
+    print("=" * width)
+    print(title)
+    print("=" * width)
+
+    header = (
+        f"{'Model':<22} {'Val Acc':<10} {'Val F1':<10} "
+        f"{'Test Acc':<10} {'Test F1':<10}"
+    )
+
+    print(header)
+    print("-" * width)
+
+    for r in results:
+        val = r["val"]
+        test = r["test"]
+
+        print(
+            f"{r['name']:<22} "
+            f"{val['accuracy']:<10.4f} {val['f1']:<10.4f} "
+            f"{test['accuracy']:<10.4f} {test['f1']:<10.4f}"
+        )
+
+    print("=" * width)
+
+
 def print_comparison_table(results, title="Classifier Comparison"):
     """Print a side-by-side comparison table of metrics."""
     print()
