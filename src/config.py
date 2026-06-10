@@ -31,12 +31,12 @@ RANDOM_STATE = 42
 # =========================
 
 # Which representation feeds the classifier:
-#   "tfidf"         - bag-of-words + LinearSVC (single-model flow)
+#   "tfidf"         - tf-idf + LinearSVC 
 #   "beto"          - frozen BETO embeddings + {LinearSVC, RandomForest}
 #   "grid"          - 2x2 grid: {TF-IDF, BETO} x {LinearSVC, RandomForest}
 #   "beto_finetune" - BETO fine-tuned end-to-end with a classification head
 #   "llm"           - zero-/few-shot classification with a local LLM (Ollama)
-FEATURE_METHOD = "grid"
+FEATURE_METHOD = "llm"
 
 # =========================
 # BETO Transformer (Spanish BERT)
@@ -69,11 +69,29 @@ SVM_MAX_ITER = 2000
 # Random Forest (used on BETO embeddings)
 RF_N_ESTIMATORS = 300
 
+# Logistic Regression (probabilistic linear baseline; gives AUC on every cell)
+LR_C = 1.0
+LR_MAX_ITER = 2000
+
 # =========================
-# LLM (local, via Ollama)
+# LLM comparison
 # =========================
-# Zero-/few-shot classification baseline. Requires a running Ollama server
-# with the model pulled:  ollama pull llama3.2:3b
-LLM_MODEL_NAME = "llama3.2:latest"
+# Zero-/few-shot classification baseline.
+#
+# All three LLMs run locally through Ollama (server must be running, models
+# pulled). Free hosted APIs (Gemini, Hugging Face) were dropped because their
+# free tiers cap well below the ~675 calls this evaluation needs.
+#   ollama pull llama3.2:3b
+#   ollama pull qwen2.5:3b
+#   ollama pull gemma2:2b
 LLM_LABELS = ("anorexia", "control")
 LLM_N_FEW_SHOT = 4  # examples per class embedded in the prompt (0 = zero-shot)
+
+# Models compared head-to-head in the "llm" flow.
+#   backend: "ollama" (local)
+#   model:   ollama tag
+LLM_MODELS = [
+    {"name": "Llama 3.2 3B", "backend": "ollama", "model": "llama3.2:latest"},
+    {"name": "Qwen 2.5 3B", "backend": "ollama", "model": "qwen2.5:3b"},
+    {"name": "Gemma 2 2B", "backend": "ollama", "model": "gemma2:2b"},
+]

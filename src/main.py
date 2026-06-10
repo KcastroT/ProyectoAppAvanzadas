@@ -32,7 +32,7 @@ from config import (
     FEATURE_METHOD,
     LABEL_COLUMN,
     LLM_LABELS,
-    LLM_MODEL_NAME,
+    LLM_MODELS,
     LLM_N_FEW_SHOT,
     RANDOM_STATE,
     CLEAN_FILE_TEST,
@@ -64,6 +64,7 @@ from data.preprocessing import (
 
 # evaluation/metrics.py
 from evaluation.metrics import (
+    compute_metrics,
     evaluate_model,
 )
 
@@ -98,6 +99,10 @@ from models.random_forest_model import (
     build_model as build_rf_model,
 )
 
+from models.logistic_regression_model import (
+    build_model as build_lr_model,
+)
+
 from models.beto_finetune import (
     build_model as build_beto_finetune_model,
 )
@@ -110,6 +115,7 @@ from evaluation.compare import (
     compare_classifiers,
     print_comparison_grid,
     print_comparison_table,
+    print_llm_comparison,
     run_full_evaluation,
 )
 
@@ -118,6 +124,8 @@ from evaluation.compare import (
 
 from sklearn.metrics import (
     accuracy_score,
+    classification_report,
+    confusion_matrix,
     f1_score,
 )
 
@@ -323,12 +331,13 @@ def main():
         )
 
         # =========================
-        # 2x2 Grid: features × classifier
+        # 2x3 Grid: features × classifier
         # =========================
-        # TF-IDF + LinearSVC: sparse non-negative input, no scaler.
-        # TF-IDF + RandomForest: scale-invariant.
-        # BETO   + LinearSVC: dense embeddings, scale with StandardScaler.
-        # BETO   + RandomForest: scale-invariant.
+        # Scaling rules:
+        #   TF-IDF + LinearSVC / LogReg: sparse non-negative input, no scaler.
+        #   TF-IDF + RandomForest: scale-invariant.
+        #   BETO   + LinearSVC / LogReg: dense embeddings -> StandardScaler.
+        #   BETO   + RandomForest: scale-invariant.
 
         combinations = [
             (
@@ -348,6 +357,14 @@ def main():
                 X_test_tfidf,
             ),
             (
+                "TF-IDF",
+                "LogisticReg",
+                build_lr_model(),
+                X_train_tfidf,
+                X_validation_tfidf,
+                X_test_tfidf,
+            ),
+            (
                 "BETO",
                 "LinearSVC",
                 make_pipeline(StandardScaler(), build_svm_model()),
@@ -359,6 +376,14 @@ def main():
                 "BETO",
                 "RandomForest",
                 build_rf_model(),
+                X_train_beto,
+                X_validation_beto,
+                X_test_beto,
+            ),
+            (
+                "BETO",
+                "LogisticReg",
+                make_pipeline(StandardScaler(), build_lr_model()),
                 X_train_beto,
                 X_validation_beto,
                 X_test_beto,
@@ -388,7 +413,8 @@ def main():
         print_comparison_grid(
             grid_results,
             title=(
-                "2x2 Grid: (TF-IDF, BETO) x (LinearSVC, RandomForest)"
+                "2x3 Grid: (TF-IDF, BETO) x "
+                "(LinearSVC, RandomForest, LogisticReg)"
             ),
         )
 
@@ -468,40 +494,86 @@ def main():
 
         return
     elif FEATURE_METHOD == "llm":
-        # Local LLM (Ollama) zero-/few-shot baseline. Each prediction is an
-        # LLM call, so we skip K-fold CV (it would mean thousands of calls)
-        # and evaluate directly on validation + test. The model emits a label,
-        # not a probability, so AUC is not available.
+        # Compare LLMs head-to-head with zero-/few-shot prompting: three local
+        # models (Llama, Qwen, Gemma) served via Ollama. Each prediction is
+        # an LLM call, so we skip K-fold CV (it would mean thousands of calls)
+        # and evaluate directly on validation + test. The models emit a label,
+        # not a probability, so AUC is N/A.
+        def build_llm(spec):
+            """Build the right classifier for a model spec by backend."""
+            backend = spec["backend"]
+
+            if backend == "ollama":
+                return build_llm_model(
+                    model_name=spec["model"],
+                    labels=LLM_LABELS,
+                    n_few_shot=LLM_N_FEW_SHOT,
+                )
+
+            raise ValueError(f"Unknown LLM backend: {backend!r}")
+
         shot_kind = (
             f"{LLM_N_FEW_SHOT}-shot per class"
             if LLM_N_FEW_SHOT > 0
             else "zero-shot"
         )
 
-        print(
-            f"\nClassifying with LLM '{LLM_MODEL_NAME}' via Ollama "
-            f"({shot_kind}) ..."
+        def report_split(split_name, y_true, metrics):
+            """Print one split's metrics + report from a single prediction pass.
+
+            ``metrics`` comes from ``compute_metrics`` (which already ran
+            ``predict`` once), so we reuse its ``y_pred`` instead of querying
+            the LLM again.
+            """
+            y_pred = metrics["y_pred"]
+
+            print(f"\n=== {split_name} Evaluation ===")
+            print(f"Accuracy: {metrics['accuracy']:.4f}")
+            print(f"F1-score: {metrics['f1']:.4f}")
+
+            print("\n=== Classification Report ===")
+            print(classification_report(y_true, y_pred))
+
+            print("=== Confusion Matrix ===")
+            print(confusion_matrix(y_true, y_pred))
+
+        llm_results = []
+
+        for spec in LLM_MODELS:
+            display_name = spec["name"]
+
+            print()
+            print("=" * 70)
+            print(
+                f"  {display_name}  "
+                f"({spec['backend']}:{spec['model']}, {shot_kind})"
+            )
+            print("=" * 70)
+
+            model = build_llm(spec)
+
+            # "Training" only records labels and samples few-shot examples.
+            model.fit(X_train, y_train)
+
+            # One prediction pass per split (LLM calls are expensive).
+            val_metrics = compute_metrics(model, X_validation, y_validation)
+
+            test_metrics = compute_metrics(model, X_test, y_test)
+
+            report_split("Validation", y_validation, val_metrics)
+
+            report_split("External Test", y_test, test_metrics)
+
+            llm_results.append({
+                "name": display_name,
+                "val": val_metrics,
+                "test": test_metrics,
+            })
+
+        print_llm_comparison(
+            llm_results,
+            title=f"LLM Comparison (Ollama, {shot_kind})",
         )
-
-        model = build_llm_model(
-            model_name=LLM_MODEL_NAME,
-            labels=LLM_LABELS,
-            n_few_shot=LLM_N_FEW_SHOT,
-        )
-
-        # "Training" only records labels and samples few-shot examples.
-        model.fit(X_train, y_train)
-
-        print("\n=== Validation Evaluation ===")
-
-        evaluate_model(model, X_validation, y_validation)
-
-        print("\n=== Model Information ===")
-        print(f"Model: {LLM_MODEL_NAME} (Ollama, {shot_kind})")
-
-        print("\n=== External Test Evaluation ===")
-
-        evaluate_model(model, X_test, y_test)
 
         return
     else:
