@@ -35,6 +35,7 @@ from config import (
     CLEAN_TEXT_COLUMN,
     LABEL_COLUMN,
     RANDOM_STATE,
+    SVM_C_BETO,
     TEST_FILE,
     TEXT_COLUMN,
     TRAIN_FILE,
@@ -75,10 +76,15 @@ MODELS = [
 ]
 
 
-def base_estimator(kind):
-    """Fresh base classifier for the given kind."""
+def base_estimator(kind, features):
+    """Fresh base classifier, matching main.py's grid configuration.
+
+    The SVM uses a representation-specific C (tuned by CV): the default
+    ``SVM_C`` for TF-IDF, and the heavier-regularized ``SVM_C_BETO`` for the
+    dense BETO embeddings.
+    """
     if kind == "svm":
-        return build_svm()
+        return build_svm(C=SVM_C_BETO) if features == "BETO" else build_svm()
     if kind == "rf":
         return build_rf()
     return build_lr()
@@ -97,7 +103,7 @@ def make_pipeline_for(features, kind):
     elif kind in ("svm", "lr"):
         steps.append(("scaler", StandardScaler()))
 
-    steps.append(("clf", base_estimator(kind)))
+    steps.append(("clf", base_estimator(kind, features)))
 
     return Pipeline(steps)
 

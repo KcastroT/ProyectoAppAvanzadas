@@ -179,6 +179,46 @@ def print_comparison_grid(results, title="Comparison Grid"):
     print("=" * width)
 
 
+def print_metrics_summary(results, split="test", title=None):
+    """Compact per-model table of the 5 headline metrics for one split.
+
+    Columns: Accuracy, Precision, Recall, F1 (all weighted) and AUC. Each
+    result dict needs a ``name`` (or ``features``+``classifier``) plus a
+    ``split`` metric dict from ``compute_metrics``.
+    """
+    if title is None:
+        title = f"{split.capitalize()} metrics (weighted)"
+
+    width = 92
+
+    print()
+    print("=" * width)
+    print(title)
+    print("=" * width)
+
+    header = (
+        f"{'Model':<26} {'Accuracy':<10} {'Precision':<10} "
+        f"{'Recall':<10} {'F1':<10} {'AUC':<10}"
+    )
+
+    print(header)
+    print("-" * width)
+
+    for r in results:
+        name = r.get("name") or f"{r['features']} + {r['classifier']}"
+        m = r[split]
+
+        auc = f"{m['auc']:.4f}" if m.get("auc") is not None else "N/A"
+
+        print(
+            f"{name:<26} "
+            f"{m['accuracy']:<10.4f} {m['precision']:<10.4f} "
+            f"{m['recall']:<10.4f} {m['f1']:<10.4f} {auc:<10}"
+        )
+
+    print("=" * width)
+
+
 def print_llm_comparison(results, title="LLM Comparison"):
     """Print a compact table comparing LLMs on validation + test.
 

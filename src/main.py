@@ -35,6 +35,7 @@ from config import (
     LLM_MODELS,
     LLM_N_FEW_SHOT,
     RANDOM_STATE,
+    SVM_C_BETO,
     CLEAN_FILE_TEST,
     TEST_FILE,
     TEST_FIXED_FILE,
@@ -116,6 +117,7 @@ from evaluation.compare import (
     print_comparison_grid,
     print_comparison_table,
     print_llm_comparison,
+    print_metrics_summary,
     run_full_evaluation,
 )
 
@@ -367,7 +369,9 @@ def main():
             (
                 "BETO",
                 "LinearSVC",
-                make_pipeline(StandardScaler(), build_svm_model()),
+                # BETO embeddings want heavier regularization than TF-IDF
+                # (tuned by 5-fold CV): C=0.01 instead of the default 1.0.
+                make_pipeline(StandardScaler(), build_svm_model(C=SVM_C_BETO)),
                 X_train_beto,
                 X_validation_beto,
                 X_test_beto,
@@ -416,6 +420,18 @@ def main():
                 "2x3 Grid: (TF-IDF, BETO) x "
                 "(LinearSVC, RandomForest, LogisticReg)"
             ),
+        )
+
+        # Compact 5-metric tables (accuracy, precision, recall, F1, AUC).
+        print_metrics_summary(
+            grid_results,
+            split="val",
+            title="Validation metrics (weighted)",
+        )
+        print_metrics_summary(
+            grid_results,
+            split="test",
+            title="External test metrics (weighted)",
         )
 
         return

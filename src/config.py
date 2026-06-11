@@ -62,8 +62,9 @@ BETO_FT_OUTPUT_DIR = Path("../runs/beto_ft")
 # =========================
 # Centralized so the academic report can cite a single source of truth.
 
-# LinearSVC (used after StandardScaler on BETO embeddings, or on TF-IDF)
-SVM_C = 1.0
+
+SVM_C = 0.1
+SVM_C_BETO = 0.1
 SVM_MAX_ITER = 2000
 
 # Random Forest (used on BETO embeddings)
