@@ -4,18 +4,13 @@ Everything here is grounded in **stratified 5-fold cross-validation** over the
 full training set, using **weighted F1** (not accuracy) to avoid being misled
 by class imbalance. No single train/test split is used as a quality signal.
 
-Three deliverables (run from ``src/``: ``python plot_classical_errors.py``):
+Deliverables (run from ``src/``: ``python plot_classical_errors.py``):
 
-  1. Learning curves (per model) — train vs validation F1 as the training set
-     grows, with ±1 std bands. Diagnoses bias (underfitting) vs variance
-     (overfitting) and whether more data would help.
-  2. Overfitting figure — grouped train vs CV F1 bars with the gap annotated
-     (green <0.05, orange 0.05-0.10, red >0.10).
-  3. Main comparison — mean CV F1 per model with std error bars, sorted
+  1. Main comparison — mean CV F1 per model with std error bars, sorted
      best→worst. Answers "which model generalizes best to unseen data?".
-
-Plus, as complementary detail, validation curves over the complexity knob
-(``C`` for the linear models, ``max_depth`` for Random Forest) and a gap bar.
+  2. Overfitting figure — grouped train vs CV F1 bars with the gap annotated
+     (green <0.05, orange 0.05-0.10, red >0.10), plus a gap bar.
+  3. CV (selection) vs external-test (confirmation): F1 and ROC/AUC.
 
 TF-IDF is vectorized inside the CV pipeline (refit on each fold, no leakage);
 BETO embeddings come from a frozen, label-independent encoder, so they are
@@ -28,12 +23,8 @@ import json
 from pathlib import Path
 
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score
-from sklearn.model_selection import (
-    StratifiedKFold,
-    cross_validate,
-    learning_curve,
-)
+from sklearn.metrics import accuracy_score, auc, f1_score, roc_curve
+from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -56,12 +47,12 @@ from data.preprocessing import (
     fix_dataframe_encoding,
 )
 from evaluation.plots import (
+    save_auc_cv_vs_test,
     save_cv_vs_test,
-    save_learning_curve_cv,
     save_model_comparison,
     save_overfit_gap_bar,
     save_overfit_synthesis,
-    save_validation_curve,
+    save_roc_cv_test,
 )
 from features.embeddings import build_embedder
 from features.vectorizer import build_vectorizer
@@ -73,13 +64,6 @@ OUTPUT_DIR = Path("../reports/figures")
 
 # 5-fold stratified CV, shared by every diagnostic.
 CV = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
-
-# Learning-curve x-axis: fractions of the training set.
-TRAIN_FRACTIONS = np.linspace(0.1, 1.0, 9)
-
-# Complexity knob swept for the (complementary) validation curves.
-C_VALUES = np.logspace(-3, 2, 8)
-DEPTH_VALUES = [1, 2, 3, 5, 8, 12, 16, 24, None]
 
 MODELS = [
     ("TF-IDF + LinearSVC", "TF-IDF", "svm"),
@@ -123,46 +107,6 @@ def slug(name):
     return name.lower().replace(" + ", "_").replace(" ", "").replace("-", "")
 
 
-def sweep_config(kind):
-    """Return (param_name, values, xlabel, log_x, tick_labels) for the sweep."""
-    if kind == "rf":
-        labels = [str(v) if v is not None else "∞" for v in DEPTH_VALUES]
-        return "clf__max_depth", DEPTH_VALUES, "max_depth", False, labels
-
-    return (
-        "clf__C",
-        list(C_VALUES),
-        "C  (inverso de la regularización)",
-        True,
-        None,
-    )
-
-
-def sweep_overfitting(features, kind, X, y, param_name, values):
-    """Train vs CV F1 (5-fold) as the complexity parameter is swept."""
-    tr_mean, tr_std, cv_mean, cv_std = [], [], [], []
-
-    for value in values:
-        pipe = make_pipeline_for(features, kind)
-        pipe.set_params(**{param_name: value})
-
-        res = cross_validate(
-            pipe, X, y, cv=CV, scoring="f1_weighted", return_train_score=True
-        )
-
-        tr_mean.append(res["train_score"].mean())
-        tr_std.append(res["train_score"].std())
-        cv_mean.append(res["test_score"].mean())
-        cv_std.append(res["test_score"].std())
-
-    return (
-        np.array(tr_mean),
-        np.array(tr_std),
-        np.array(cv_mean),
-        np.array(cv_std),
-    )
-
-
 def cv_scores(features, kind, X, y):
     """Default-config 5-fold CV: (train_mean, cv_mean, cv_std)."""
     pipe = make_pipeline_for(features, kind)
@@ -192,6 +136,78 @@ def test_eval(features, kind, X_tr, y_tr, X_te, y_te):
         f1_score(y_te, pred, average="weighted"),
         accuracy_score(y_te, pred),
     )
+
+
+# Class we treat as "positive" for ROC/AUC (the condition to detect).
+POS_LABEL = "anorexia"
+
+
+def positive_scores(fitted, X):
+    """Continuous score for POS_LABEL (decision_function or predict_proba).
+
+    Higher = more likely POS_LABEL. Works for a fitted Pipeline; LinearSVC's
+    decision_function is signed toward classes_[1], so flip it if POS_LABEL is
+    classes_[0].
+    """
+    classes = list(fitted.classes_)
+
+    if hasattr(fitted, "decision_function"):
+        score = fitted.decision_function(X)
+        return score if POS_LABEL == classes[1] else -score
+
+    proba = fitted.predict_proba(X)
+    return proba[:, classes.index(POS_LABEL)]
+
+
+def roc_cv_and_test(features, kind, X_tr, y_tr, X_te, y_te):
+    """Per-fold CV ROC (mean ±std) + external-test ROC for one model.
+
+    Returns a dict with the interpolated CV ROC, its AUC mean/std, and the
+    test ROC + AUC.
+    """
+    mean_fpr = np.linspace(0.0, 1.0, 100)
+
+    tprs = []
+    aucs = []
+
+    for train_idx, val_idx in CV.split(X_tr, y_tr):
+        pipe = make_pipeline_for(features, kind)
+        pipe.fit(_take(X_tr, train_idx), y_tr[train_idx])
+
+        scores = positive_scores(pipe, _take(X_tr, val_idx))
+        fpr, tpr, _ = roc_curve(
+            y_tr[val_idx], scores, pos_label=POS_LABEL
+        )
+
+        interp_tpr = np.interp(mean_fpr, fpr, tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(auc(fpr, tpr))
+
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+
+    # External test: fit on the full training set, score once on test.
+    pipe = make_pipeline_for(features, kind)
+    pipe.fit(X_tr, y_tr)
+    test_scores = positive_scores(pipe, X_te)
+    test_fpr, test_tpr, _ = roc_curve(y_te, test_scores, pos_label=POS_LABEL)
+
+    return {
+        "mean_fpr": mean_fpr,
+        "mean_tpr": mean_tpr,
+        "std_tpr": np.std(tprs, axis=0),
+        "cv_auc_mean": float(np.mean(aucs)),
+        "cv_auc_std": float(np.std(aucs)),
+        "test_fpr": test_fpr,
+        "test_tpr": test_tpr,
+        "test_auc": float(auc(test_fpr, test_tpr)),
+    }
+
+
+def _take(X, idx):
+    """Index rows of either a numpy array or an object array of texts."""
+    return X[idx]
 
 
 def main():
@@ -251,50 +267,7 @@ def main():
         return X_test_text if features == "TF-IDF" else X_test_beto
 
     # =========================
-    # 1) Learning curves (CV F1, train vs validation)
-    # =========================
-
-    print("\n=== 1) Learning curves (5-fold CV) ===")
-
-    lc_data = []
-
-    for name, features, kind in MODELS:
-        print(f"  {name} ...")
-
-        sizes, train_scores, val_scores = learning_curve(
-            make_pipeline_for(features, kind),
-            get_X(features),
-            y,
-            train_sizes=TRAIN_FRACTIONS,
-            cv=CV,
-            scoring="f1_weighted",
-        )
-
-        lc_data.append({
-            "name": name,
-            "sizes": sizes,
-            "train_mean": train_scores.mean(axis=1),
-            "train_std": train_scores.std(axis=1),
-            "val_mean": val_scores.mean(axis=1),
-            "val_std": val_scores.std(axis=1),
-        })
-
-    # Shared, normalized y-scale so the six curves are comparable.
-    lc_low = min(
-        float((d["val_mean"] - d["val_std"]).min()) for d in lc_data
-    )
-    lc_ylim = (lc_low - 0.03, 1.02)
-
-    for d in lc_data:
-        path = OUTPUT_DIR / f"learning_curve_{slug(d['name'])}.png"
-        save_learning_curve_cv(
-            d["sizes"], d["train_mean"], d["train_std"],
-            d["val_mean"], d["val_std"], path, d["name"], ylim=lc_ylim,
-        )
-        print(f"  -> {path}")
-
-    # =========================
-    # 2) + 3) Overfitting figure and main comparison
+    # CV scores: overfitting figure and main comparison
     # =========================
 
     print("\n=== 2)/3) CV scores per model ===")
@@ -381,49 +354,50 @@ def main():
     print(f"-> {OUTPUT_DIR / 'cv_vs_test.png'}")
 
     # =========================
-    # Complementary: validation curves over the complexity knob
+    # ROC curves + AUC (validation via CV, and external test)
     # =========================
 
-    print("\n=== Validation curves (complementary) ===")
+    print(f"\n=== ROC / AUC (positive class = {POS_LABEL}) ===")
 
-    val_curves = []
+    auc_cv_mean = []
+    auc_cv_std = []
+    auc_test = []
 
     for name, features, kind in MODELS:
-        param_name, values, xlabel, log_x, tick_labels = sweep_config(kind)
-        print(f"  sweep {name}  ({param_name}) ...")
-
-        tr_m, tr_s, cv_m, cv_s = sweep_overfitting(
-            features, kind, get_X(features), y, param_name, values
+        roc = roc_cv_and_test(
+            features, kind, get_X(features), y, get_X_test(features), y_test
         )
 
-        x_vals = (
-            np.arange(len(values)) if kind == "rf"
-            else np.array(values, dtype=float)
+        auc_cv_mean.append(roc["cv_auc_mean"])
+        auc_cv_std.append(roc["cv_auc_std"])
+        auc_test.append(roc["test_auc"])
+
+        save_roc_cv_test(
+            roc["mean_fpr"], roc["mean_tpr"], roc["std_tpr"],
+            roc["cv_auc_mean"], roc["cv_auc_std"],
+            roc["test_fpr"], roc["test_tpr"], roc["test_auc"],
+            OUTPUT_DIR / f"roc_{slug(name)}.png", name, pos_label=POS_LABEL,
         )
 
-        val_curves.append({
-            "name": name, "x_vals": x_vals,
-            "train_mean": tr_m, "train_std": tr_s,
-            "cv_mean": cv_m, "cv_std": cv_s,
-            "xlabel": xlabel, "log_x": log_x, "tick_labels": tick_labels,
-            "best_idx": int(np.argmax(cv_m)),
-        })
+        print(
+            f"  {name:<24} AUC_cv={roc['cv_auc_mean']:.3f}±"
+            f"{roc['cv_auc_std']:.3f}  AUC_test={roc['test_auc']:.3f}"
+        )
 
-    vc_scores = np.concatenate(
-        [c["cv_mean"] for c in val_curves] + [c["train_mean"] for c in val_curves]
+    auc_low = max(
+        0.5,
+        min(
+            float(min(np.array(auc_cv_mean) - np.array(auc_cv_std))),
+            float(min(auc_test)),
+        ) - 0.03,
     )
-    vc_ylim = (float(vc_scores.min()) - 0.03, 1.02)
-
-    for c in val_curves:
-        path = OUTPUT_DIR / f"validation_curve_{slug(c['name'])}.png"
-        save_validation_curve(
-            c["x_vals"], c["train_mean"], c["train_std"],
-            c["cv_mean"], c["cv_std"], path, c["name"],
-            xlabel=c["xlabel"], log_x=c["log_x"],
-            x_tick_labels=c["tick_labels"], best_idx=c["best_idx"],
-            ylim=vc_ylim,
-        )
-        print(f"  -> {path}")
+    save_auc_cv_vs_test(
+        names, auc_cv_mean, auc_cv_std, auc_test,
+        OUTPUT_DIR / "auc_cv_vs_test.png",
+        title="AUC — validación cruzada vs. test externo (modelos clásicos)",
+        ylim=(auc_low, 1.005),
+    )
+    print(f"-> {OUTPUT_DIR / 'auc_cv_vs_test.png'}")
 
     # =========================
     # Persist the numbers
@@ -438,6 +412,9 @@ def main():
             "overfit_gap": float(train_f1[i] - cv_f1[i]),
             "test_f1": float(test_f1[i]),
             "test_accuracy": float(test_acc[i]),
+            "auc_cv_mean": float(auc_cv_mean[i]),
+            "auc_cv_std": float(auc_cv_std[i]),
+            "auc_test": float(auc_test[i]),
         }
         for i in range(len(names))
     ]

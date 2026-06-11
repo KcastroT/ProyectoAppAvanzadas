@@ -17,149 +17,6 @@ TRAIN_COLOR = "#1f77b4"  # blue
 TEST_COLOR = "#d62728"   # red
 
 
-def save_learning_curve(
-    train_sizes,
-    train_error_mean,
-    train_error_std,
-    test_error_mean,
-    test_error_std,
-    out_path,
-    title,
-):
-    """Plot training vs test error as a function of the training-set size.
-
-    A large persistent gap (low train error, high test error) signals
-    overfitting; both errors high and close together signals underfitting.
-
-    Args:
-        train_sizes: 1-D array of absolute training-set sizes (x axis).
-        train_error_mean / train_error_std: error on the training subset.
-        test_error_mean / test_error_std: error on the external test set.
-        out_path: where to write the PNG.
-        title: figure title (usually the model name).
-    """
-    train_sizes = np.asarray(train_sizes)
-    train_error_mean = np.asarray(train_error_mean)
-    train_error_std = np.asarray(train_error_std)
-    test_error_mean = np.asarray(test_error_mean)
-    test_error_std = np.asarray(test_error_std)
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-
-    ax.plot(
-        train_sizes,
-        train_error_mean,
-        "o-",
-        color=TRAIN_COLOR,
-        label="Error de entrenamiento",
-    )
-    ax.fill_between(
-        train_sizes,
-        train_error_mean - train_error_std,
-        train_error_mean + train_error_std,
-        alpha=0.15,
-        color=TRAIN_COLOR,
-    )
-
-    ax.plot(
-        train_sizes,
-        test_error_mean,
-        "s-",
-        color=TEST_COLOR,
-        label="Error de prueba (test)",
-    )
-    ax.fill_between(
-        train_sizes,
-        test_error_mean - test_error_std,
-        test_error_mean + test_error_std,
-        alpha=0.15,
-        color=TEST_COLOR,
-    )
-
-    ax.set_xlabel("Número de ejemplos de entrenamiento")
-    ax.set_ylabel("Error de clasificación (1 − accuracy)")
-    ax.set_title(f"Curva de aprendizaje — {title}")
-    ax.grid(True, alpha=0.3)
-    ax.legend(loc="best")
-
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
-
-
-def save_learning_curve_dual(
-    train_sizes,
-    train_error_mean,
-    test_error_mean,
-    out_path,
-    title,
-    error_ylim=None,
-    acc_ylim=None,
-):
-    """Keras-style two-panel learning curve (error + accuracy).
-
-    Mirrors the familiar "Training and validation loss / accuracy" layout:
-    the training metric is drawn as dots and the test metric as a solid line,
-    both in blue. Pass shared ``error_ylim`` / ``acc_ylim`` so every model's
-    figure uses the same scale and can be compared side by side.
-
-    Args:
-        train_sizes: 1-D array of absolute training-set sizes (x axis).
-        train_error_mean: error on the training subset (1 − accuracy).
-        test_error_mean: error on the external test set (1 − accuracy).
-        out_path: where to write the PNG.
-        title: overall figure title (the model name).
-        error_ylim / acc_ylim: (low, high) tuples shared across all models.
-    """
-    train_sizes = np.asarray(train_sizes)
-    train_error_mean = np.asarray(train_error_mean)
-    test_error_mean = np.asarray(test_error_mean)
-
-    train_acc = 1.0 - train_error_mean
-    test_acc = 1.0 - test_error_mean
-
-    fig, (ax_err, ax_acc) = plt.subplots(1, 2, figsize=(13, 5))
-
-    # ----- left: error ("loss" analog) -----
-    ax_err.plot(
-        train_sizes, train_error_mean, "o", color=TRAIN_COLOR,
-        label="Error de entrenamiento",
-    )
-    ax_err.plot(
-        train_sizes, test_error_mean, "-", color=TRAIN_COLOR,
-        label="Error de prueba (test)",
-    )
-    ax_err.set_title("Error de entrenamiento y prueba")
-    ax_err.set_xlabel("Número de ejemplos de entrenamiento")
-    ax_err.set_ylabel("Error (1 − accuracy)")
-    if error_ylim is not None:
-        ax_err.set_ylim(error_ylim)
-    ax_err.grid(True, alpha=0.3)
-    ax_err.legend(loc="best")
-
-    # ----- right: accuracy -----
-    ax_acc.plot(
-        train_sizes, train_acc, "o", color=TRAIN_COLOR,
-        label="Accuracy de entrenamiento",
-    )
-    ax_acc.plot(
-        train_sizes, test_acc, "-", color=TRAIN_COLOR,
-        label="Accuracy de prueba (test)",
-    )
-    ax_acc.set_title("Accuracy de entrenamiento y prueba")
-    ax_acc.set_xlabel("Número de ejemplos de entrenamiento")
-    ax_acc.set_ylabel("Accuracy")
-    if acc_ylim is not None:
-        ax_acc.set_ylim(acc_ylim)
-    ax_acc.grid(True, alpha=0.3)
-    ax_acc.legend(loc="best")
-
-    fig.suptitle(title, fontsize=13)
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
-
-
 def save_train_test_bars(
     labels,
     train_values,
@@ -223,98 +80,6 @@ def save_train_test_bars(
                     va="bottom",
                     fontsize=8,
                 )
-
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
-
-
-def save_validation_curve(
-    x_values,
-    train_mean,
-    train_std,
-    cv_mean,
-    cv_std,
-    out_path,
-    title,
-    xlabel,
-    log_x=False,
-    x_tick_labels=None,
-    best_idx=None,
-    ylim=None,
-):
-    """Plot train vs cross-validation score as a complexity knob is swept.
-
-    Overfitting reads directly off this curve: the training score climbs
-    toward 1.0 while the cross-validation score plateaus or drops, and the
-    vertical gap between the two is the amount of overfitting.
-
-    Args:
-        x_values: numeric x positions (the swept parameter, or 0..n-1 indices
-            when the parameter is categorical such as ``max_depth`` with None).
-        train_mean / train_std: training F1 across CV folds.
-        cv_mean / cv_std: validation (held-out fold) F1.
-        out_path: where to write the PNG.
-        title: figure title (the model name).
-        xlabel: x-axis label.
-        log_x: use a logarithmic x-axis (for a C sweep).
-        x_tick_labels: explicit tick labels (for categorical sweeps).
-        best_idx: index of the best-CV point to mark with a dashed line.
-        ylim: shared (low, high) y-limits across models.
-    """
-    x_values = np.asarray(x_values, dtype=float)
-    train_mean = np.asarray(train_mean)
-    train_std = np.asarray(train_std)
-    cv_mean = np.asarray(cv_mean)
-    cv_std = np.asarray(cv_std)
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-
-    if log_x:
-        ax.set_xscale("log")
-
-    ax.plot(
-        x_values, train_mean, "o-", color=TRAIN_COLOR,
-        label="F1 entrenamiento",
-    )
-    ax.fill_between(
-        x_values, train_mean - train_std, train_mean + train_std,
-        alpha=0.15, color=TRAIN_COLOR,
-    )
-
-    ax.plot(
-        x_values, cv_mean, "s-", color=TEST_COLOR,
-        label="F1 validación cruzada (5-fold)",
-    )
-    ax.fill_between(
-        x_values, cv_mean - cv_std, cv_mean + cv_std,
-        alpha=0.15, color=TEST_COLOR,
-    )
-
-    if best_idx is not None:
-        ax.axvline(x_values[best_idx], ls="--", color="gray", alpha=0.7)
-        ax.annotate(
-            "mejor CV",
-            xy=(x_values[best_idx], cv_mean[best_idx]),
-            xytext=(0, -18),
-            textcoords="offset points",
-            ha="center",
-            color="gray",
-            fontsize=9,
-        )
-
-    if x_tick_labels is not None:
-        ax.set_xticks(x_values)
-        ax.set_xticklabels(x_tick_labels)
-
-    if ylim is not None:
-        ax.set_ylim(ylim)
-
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel("F1-score (weighted)")
-    ax.set_title(f"Curva de validación — {title}")
-    ax.grid(True, alpha=0.3)
-    ax.legend(loc="best")
 
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
@@ -430,71 +195,6 @@ def save_overfit_synthesis(labels, train_f1, cv_f1, out_path, title, ylim=None):
     plt.close(fig)
 
 
-def save_learning_curve_cv(
-    train_sizes,
-    train_mean,
-    train_std,
-    val_mean,
-    val_std,
-    out_path,
-    title,
-    ylim=None,
-):
-    """Learning curve from stratified 5-fold CV (F1, train vs validation).
-
-    For each training-set size, the training and validation F1 are averaged
-    across the CV folds; the shaded band is ±1 standard deviation. Reading it:
-    both curves low and close = underfitting (high bias); a wide persistent gap
-    = overfitting (high variance); a still-rising validation curve = more data
-    would help.
-
-    Args:
-        train_sizes: absolute training-set sizes (x axis).
-        train_mean / train_std: training F1 mean and std across folds.
-        val_mean / val_std: validation (held-out fold) F1 mean and std.
-        out_path: where to write the PNG.
-        title: figure title (the model name).
-        ylim: shared (low, high) y-limits across models.
-    """
-    train_sizes = np.asarray(train_sizes)
-    train_mean = np.asarray(train_mean)
-    train_std = np.asarray(train_std)
-    val_mean = np.asarray(val_mean)
-    val_std = np.asarray(val_std)
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-
-    ax.plot(
-        train_sizes, train_mean, "o-", color=TRAIN_COLOR,
-        label="F1 entrenamiento",
-    )
-    ax.fill_between(
-        train_sizes, train_mean - train_std, train_mean + train_std,
-        alpha=0.15, color=TRAIN_COLOR,
-    )
-
-    ax.plot(
-        train_sizes, val_mean, "o-", color=TEST_COLOR,
-        label="F1 validación (CV 5-fold)",
-    )
-    ax.fill_between(
-        train_sizes, val_mean - val_std, val_mean + val_std,
-        alpha=0.15, color=TEST_COLOR,
-    )
-
-    ax.set_xlabel("Número de ejemplos de entrenamiento")
-    ax.set_ylabel("F1-score (weighted)")
-    ax.set_title(f"Curva de aprendizaje — {title}")
-    if ylim is not None:
-        ax.set_ylim(ylim)
-    ax.grid(True, alpha=0.3)
-    ax.legend(loc="best")
-
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
-
-
 def save_model_comparison(labels, means, stds, out_path, title, ylim=None):
     """Main comparison: mean 5-fold CV F1 per model (sorted best→worst).
 
@@ -591,6 +291,110 @@ def save_cv_vs_test(labels, cv_mean, cv_std, test_f1, out_path, title, ylim=None
             )
 
     ax.set_ylabel("F1-score (weighted)")
+    ax.set_title(title)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=20, ha="right")
+    ax.grid(True, axis="y", alpha=0.3)
+    ax.legend(loc="lower left")
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def save_roc_cv_test(
+    mean_fpr,
+    mean_tpr,
+    std_tpr,
+    cv_auc_mean,
+    cv_auc_std,
+    test_fpr,
+    test_tpr,
+    test_auc,
+    out_path,
+    title,
+    pos_label="anorexia",
+):
+    """ROC curves: cross-validated (mean ±std band) vs external test.
+
+    The CV curve is the mean of the per-fold ROC curves (band = ±1 std across
+    folds); the test curve is the single ROC on the held-out test set. The
+    dashed diagonal is the no-skill baseline. AUCs go in the legend.
+    """
+    mean_fpr = np.asarray(mean_fpr)
+    mean_tpr = np.asarray(mean_tpr)
+    std_tpr = np.asarray(std_tpr)
+
+    fig, ax = plt.subplots(figsize=(7, 7))
+
+    ax.plot([0, 1], [0, 1], "--", color="gray", alpha=0.7, label="Azar (AUC = 0.5)")
+
+    ax.plot(
+        mean_fpr, mean_tpr, "-", color=TRAIN_COLOR, lw=2,
+        label=f"Validación cruzada (AUC = {cv_auc_mean:.3f} ± {cv_auc_std:.3f})",
+    )
+    ax.fill_between(
+        mean_fpr,
+        np.clip(mean_tpr - std_tpr, 0, 1),
+        np.clip(mean_tpr + std_tpr, 0, 1),
+        color=TRAIN_COLOR, alpha=0.15,
+    )
+
+    ax.plot(
+        test_fpr, test_tpr, "-", color="#2ca02c", lw=2,
+        label=f"Test externo (AUC = {test_auc:.3f})",
+    )
+
+    ax.set_xlim(-0.01, 1.01)
+    ax.set_ylim(-0.01, 1.01)
+    ax.set_xlabel(f"Tasa de falsos positivos (clase positiva: {pos_label})")
+    ax.set_ylabel("Tasa de verdaderos positivos")
+    ax.set_title(f"Curva ROC — {title}")
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="lower right")
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150)
+    plt.close(fig)
+
+
+def save_auc_cv_vs_test(labels, cv_auc_mean, cv_auc_std, test_auc, out_path, title, ylim=None):
+    """Grouped bars: CV AUC (mean ±std) vs external-test AUC, sorted best→worst."""
+    labels = list(labels)
+    cv_auc_mean = np.asarray(cv_auc_mean, dtype=float)
+    cv_auc_std = np.asarray(cv_auc_std, dtype=float)
+    test_auc = np.asarray(test_auc, dtype=float)
+
+    order = np.argsort(cv_auc_mean)[::-1]
+    labels = [labels[i] for i in order]
+    cv_auc_mean = cv_auc_mean[order]
+    cv_auc_std = cv_auc_std[order]
+    test_auc = test_auc[order]
+
+    x = np.arange(len(labels))
+    width = 0.38
+
+    fig, ax = plt.subplots(figsize=(12, 6.5))
+
+    ax.bar(
+        x - width / 2, cv_auc_mean, width, yerr=cv_auc_std, capsize=6,
+        color="#4c72b0", label="AUC validación cruzada (5-fold)",
+        error_kw={"ecolor": "#333", "elinewidth": 1.2},
+    )
+    ax.bar(
+        x + width / 2, test_auc, width,
+        color="#2ca02c", label="AUC test externo (375 tuits)",
+    )
+
+    for xi, cvv, tev in zip(x, cv_auc_mean, test_auc):
+        ax.annotate(f"{cvv:.3f}", xy=(xi - width / 2, cvv), xytext=(0, 3),
+                    textcoords="offset points", ha="center", va="bottom", fontsize=8)
+        ax.annotate(f"{tev:.3f}", xy=(xi + width / 2, tev), xytext=(0, 3),
+                    textcoords="offset points", ha="center", va="bottom", fontsize=8)
+
+    ax.set_ylabel("AUC (ROC)")
     ax.set_title(title)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=20, ha="right")
