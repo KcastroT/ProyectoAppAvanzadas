@@ -98,6 +98,38 @@ class TestOllamaClassifier(unittest.TestCase):
 
         self.assertEqual(clf._parse_label("{}"), "anorexia")
 
+    # ----- probability parsing (for AUC) -----
+
+    def test_parse_prob_reads_value(self):
+
+        clf = fitted()
+
+        content = '{"label": "anorexia", "prob_anorexia": 0.8}'
+
+        self.assertEqual(clf._parse_prob(content, "anorexia"), 0.8)
+
+    def test_parse_prob_missing_uses_label(self):
+
+        clf = fitted()
+
+        # No prob field -> coarse value implied by the (positive) label.
+        self.assertEqual(clf._parse_prob('{"label": "anorexia"}', "anorexia"), 0.85)
+
+    def test_parse_prob_out_of_range_falls_back(self):
+
+        clf = fitted()
+
+        self.assertEqual(
+            clf._parse_prob('{"prob_anorexia": 5}', "control"), 0.15
+        )
+
+    def test_prob_from_label(self):
+
+        clf = fitted()
+
+        self.assertEqual(clf._prob_from_label("anorexia"), 0.85)
+        self.assertEqual(clf._prob_from_label("control"), 0.15)
+
     # ----- truncation -----
 
     def test_truncate_collapses_whitespace(self):

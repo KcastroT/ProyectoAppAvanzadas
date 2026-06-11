@@ -497,8 +497,8 @@ def main():
         # Compare LLMs head-to-head with zero-/few-shot prompting: three local
         # models (Llama, Qwen, Gemma) served via Ollama. Each prediction is
         # an LLM call, so we skip K-fold CV (it would mean thousands of calls)
-        # and evaluate directly on validation + test. The models emit a label,
-        # not a probability, so AUC is N/A.
+        # and evaluate directly on validation + test. The models also report a
+        # probability (prob_anorexia), so AUC is available via predict_proba.
         def build_llm(spec):
             """Build the right classifier for a model spec by backend."""
             backend = spec["backend"]
@@ -530,6 +530,9 @@ def main():
             print(f"\n=== {split_name} Evaluation ===")
             print(f"Accuracy: {metrics['accuracy']:.4f}")
             print(f"F1-score: {metrics['f1']:.4f}")
+
+            if metrics.get("auc") is not None:
+                print(f"AUC: {metrics['auc']:.4f}")
 
             print("\n=== Classification Report ===")
             print(classification_report(y_true, y_pred))

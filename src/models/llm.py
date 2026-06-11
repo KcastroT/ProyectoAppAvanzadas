@@ -7,7 +7,9 @@ evaluation harness as the TF-IDF / BETO models.
 Unlike the other estimators, this model is **not trained**: ``fit`` only records
 the label set and (optionally) picks a handful of labeled examples from the
 training data to include in the prompt (few-shot). ``predict`` then asks the LLM
-to label each text, parsing a JSON ``{"label": ...}`` response.
+to label each text, parsing a JSON ``{"label": ..., "prob_anorexia": ...}``
+response; the self-reported probability also powers ``predict_proba`` (and thus
+ROC/AUC), useful for ranking but only loosely calibrated.
 
 It talks to Ollama's local REST API (http://localhost:11434) using only the
 Python standard library, so it adds no extra dependencies. Make sure Ollama is
@@ -79,7 +81,14 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
         # classes_ is required by the evaluation harness (metrics.py).
         self.classes_ = np.array(sorted(set(self.labels)))
 
+        # Positive class for the self-reported probability / AUC. classes_ is
+        # sorted, so classes_[0] == "anorexia" (the condition to detect).
         self._fallback_label = self.classes_[0]
+        self._positive_label = self.classes_[0]
+
+        # predict() and predict_proba() share one query pass via this cache.
+        self._cache_key = None
+        self._cache = None
 
         self._few_shot = self._select_few_shot(np.asarray(X, dtype=object), y)
 
@@ -87,19 +96,51 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
 
     def predict(self, X):
         """Label each text by querying the LLM."""
+        return self._query_all(X)[0]
+
+    def predict_proba(self, X):
+        """Return ``[P(anorexia), P(control)]`` per text (columns match classes_).
+
+        The probabilities are the LLM's own self-reported confidence, which
+        enables ROC/AUC for the LLM rows. They are useful for *ranking* (AUC)
+        but only loosely calibrated.
+        """
+        return self._query_all(X)[1]
+
+    def _query_all(self, X):
+        """Query each text once; return ``(labels, proba)`` and cache them.
+
+        ``predict`` and ``predict_proba`` both call this; caching on the exact
+        input avoids re-querying the LLM when the harness asks for both.
+        """
         texts = [str(text) for text in X]
 
-        predictions = []
+        key = tuple(texts)
+
+        if self._cache_key == key:
+            return self._cache
+
+        labels = []
+        probs = []
 
         for idx, text in enumerate(texts, start=1):
-            label = self._classify_one(text)
+            label, p_pos = self._classify_one(text)
 
-            predictions.append(label)
+            labels.append(label)
+            probs.append(p_pos)
 
             if self.verbose and idx % self.verbose == 0:
                 print(f"    [LLM] {idx}/{len(texts)} classified")
 
-        return np.array(predictions)
+        p_pos = np.asarray(probs, dtype=float)
+
+        # Columns ordered to match classes_ == [positive, other].
+        proba = np.column_stack([p_pos, 1.0 - p_pos])
+
+        self._cache_key = key
+        self._cache = (np.array(labels), proba)
+
+        return self._cache
 
     # =========================
     # Prompt construction
@@ -147,8 +188,10 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
         system = (
             f"{self.task_description}\n"
             f"Responde unicamente con un objeto JSON con la forma "
-            f'{{"label": <etiqueta>}}, donde <etiqueta> es exactamente uno de: '
-            f"{label_list}. No agregues explicaciones."
+            f'{{"label": <etiqueta>, "prob_anorexia": <numero>}}, donde '
+            f"<etiqueta> es exactamente uno de: {label_list}, y <numero> es la "
+            f'probabilidad (entre 0 y 1) de que el tuit sea de la clase '
+            f'"{self._positive_label}". No agregues explicaciones.'
         )
 
         messages = [{"role": "system", "content": system}]
@@ -156,10 +199,16 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
         for ex_text, ex_label in self._few_shot:
             messages.append({"role": "user", "content": f"Tuit: {ex_text}"})
 
+            ex_prob = (
+                0.95 if str(ex_label) == str(self._positive_label) else 0.05
+            )
+
             messages.append(
                 {
                     "role": "assistant",
-                    "content": json.dumps({"label": ex_label}),
+                    "content": json.dumps(
+                        {"label": ex_label, "prob_anorexia": ex_prob}
+                    ),
                 }
             )
 
@@ -186,10 +235,14 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
             content = self._post_chat(payload)
 
             label = self._parse_label(content)
-        except (urllib.error.URLError, TimeoutError, ValueError, KeyError):
-            label = self._fallback_label
+            prob = self._parse_prob(content, label)
 
-        return label
+            return label, prob
+        except (urllib.error.URLError, TimeoutError, ValueError, KeyError):
+            # Never let a single bad call abort the whole comparison.
+            fallback = self._fallback_label
+
+            return fallback, self._prob_from_label(fallback)
 
     def _post_chat(self, payload):
         data = json.dumps(payload).encode("utf-8")
@@ -222,6 +275,28 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
                 return label
 
         return self._fallback_label
+
+    def _parse_prob(self, content, label):
+        """Extract the self-reported P(positive class) from the JSON response.
+
+        Falls back to a label-consistent value when the field is missing or out
+        of range, so the probability (and thus AUC) stays well-defined.
+        """
+        try:
+            parsed = json.loads(content)
+
+            value = float(parsed.get("prob_anorexia"))
+
+            if 0.0 <= value <= 1.0:
+                return value
+        except (TypeError, ValueError, AttributeError):
+            pass
+
+        return self._prob_from_label(label)
+
+    def _prob_from_label(self, label):
+        """Coarse P(positive) implied by a hard label (no probability given)."""
+        return 0.85 if str(label) == str(self._positive_label) else 0.15
 
 
 def build_model(

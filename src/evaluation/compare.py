@@ -182,11 +182,12 @@ def print_comparison_grid(results, title="Comparison Grid"):
 def print_llm_comparison(results, title="LLM Comparison"):
     """Print a compact table comparing LLMs on validation + test.
 
-    LLMs emit a label (not a score) and we skip CV for them, so this table
-    omits CV / AUC columns. Each result dict needs ``name`` plus ``val`` and
-    ``test`` metric dicts (with ``accuracy`` and ``f1``).
+    We skip CV for LLMs (too many calls), so this table omits the CV column.
+    AUC comes from the LLM's self-reported probability (predict_proba). Each
+    result dict needs ``name`` plus ``val`` and ``test`` metric dicts (with
+    ``accuracy``, ``f1`` and ``auc``).
     """
-    width = 74
+    width = 96
 
     print()
     print("=" * width)
@@ -194,8 +195,8 @@ def print_llm_comparison(results, title="LLM Comparison"):
     print("=" * width)
 
     header = (
-        f"{'Model':<22} {'Val Acc':<10} {'Val F1':<10} "
-        f"{'Test Acc':<10} {'Test F1':<10}"
+        f"{'Model':<22} {'Val Acc':<10} {'Val F1':<10} {'Val AUC':<10} "
+        f"{'Test Acc':<10} {'Test F1':<10} {'Test AUC':<10}"
     )
 
     print(header)
@@ -205,10 +206,15 @@ def print_llm_comparison(results, title="LLM Comparison"):
         val = r["val"]
         test = r["test"]
 
+        val_auc = f"{val['auc']:.4f}" if val.get("auc") is not None else "N/A"
+        test_auc = (
+            f"{test['auc']:.4f}" if test.get("auc") is not None else "N/A"
+        )
+
         print(
             f"{r['name']:<22} "
-            f"{val['accuracy']:<10.4f} {val['f1']:<10.4f} "
-            f"{test['accuracy']:<10.4f} {test['f1']:<10.4f}"
+            f"{val['accuracy']:<10.4f} {val['f1']:<10.4f} {val_auc:<10} "
+            f"{test['accuracy']:<10.4f} {test['f1']:<10.4f} {test_auc:<10}"
         )
 
     print("=" * width)
