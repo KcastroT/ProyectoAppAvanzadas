@@ -36,7 +36,7 @@ RANDOM_STATE = 42
 #   "grid"          - 2x2 grid: {TF-IDF, BETO} x {LinearSVC, RandomForest}
 #   "beto_finetune" - BETO fine-tuned end-to-end with a classification head
 #   "llm"           - zero-/few-shot classification with a local LLM (Ollama)
-FEATURE_METHOD = "llm"
+FEATURE_METHOD = "grid"
 
 # =========================
 # BETO Transformer (Spanish BERT)

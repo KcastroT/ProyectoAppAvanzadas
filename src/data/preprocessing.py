@@ -83,10 +83,13 @@ def fix_encoding(text: str) -> str:
 
 
 def fix_dataframe_encoding(df: pd.DataFrame) -> pd.DataFrame:
-    """Fix encoding for all object columns."""
+    """Fix encoding for all text columns."""
     df_copy = df.copy()
 
-    for col in df_copy.select_dtypes(include="object").columns:
+    # Select both legacy "object" and the dedicated pandas 3 "str" dtype so
+    # text columns are picked up without relying on deprecated behavior.
+    # fix_encoding is a no-op on non-strings, so this is safe either way.
+    for col in df_copy.select_dtypes(include=["object", "str"]).columns:
         df_copy[col] = df_copy[col].apply(fix_encoding)
 
     return df_copy
