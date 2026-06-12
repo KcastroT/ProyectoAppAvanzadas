@@ -36,7 +36,7 @@ RANDOM_STATE = 42
 #   "grid"          - 2x2 grid: {TF-IDF, BETO} x {LinearSVC, RandomForest}
 #   "beto_finetune" - BETO fine-tuned end-to-end with a classification head
 #   "llm"           - zero-/few-shot classification with a local LLM (Ollama)
-FEATURE_METHOD = "llm"
+FEATURE_METHOD = "grid"
 
 # =========================
 # BETO Transformer (Spanish BERT)
@@ -60,7 +60,6 @@ BETO_FT_OUTPUT_DIR = Path("../runs/beto_ft")
 # =========================
 # Classifier Hyperparameters
 # =========================
-# Centralized so the academic report can cite a single source of truth.
 
 
 SVM_C = 0.1
@@ -78,10 +77,6 @@ LR_MAX_ITER = 2000
 # LLM comparison
 # =========================
 # Zero-/few-shot classification baseline.
-#
-# All three LLMs run locally through Ollama (server must be running, models
-# pulled). Free hosted APIs (Gemini, Hugging Face) were dropped because their
-# free tiers cap well below the ~675 calls this evaluation needs.
 #   ollama pull llama3.2:3b
 #   ollama pull qwen2.5:3b
 #   ollama pull gemma2:2b

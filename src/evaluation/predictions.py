@@ -1,3 +1,5 @@
+"""Build and slice prediction-result DataFrames (correct/incorrect, FP/FN)."""
+
 import pandas as pd
 
 

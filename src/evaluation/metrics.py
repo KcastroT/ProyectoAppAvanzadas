@@ -1,3 +1,5 @@
+"""Metric helpers: compute accuracy/precision/recall/F1/AUC and verbose reports."""
+
 from sklearn.metrics import (
     accuracy_score,
     classification_report,

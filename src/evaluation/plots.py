@@ -1,9 +1,4 @@
-"""Plotting helpers for diagnosing the classical models (train vs test error).
-
-Pure plotting: callers compute the numbers and pass arrays in. Uses the
-non-interactive ``Agg`` backend so figures are written straight to disk
-without needing a display.
-"""
+"""Plotting helpers for diagnosing the classical models (train vs test error).."""
 
 import matplotlib
 
@@ -163,6 +158,7 @@ def save_overfit_synthesis(labels, train_f1, cv_f1, out_path, title, ylim=None):
     # Gap (overfitting) annotated above each pair, colored by severity:
     # <0.05 low (green), 0.05-0.10 moderate (orange), >0.10 high (red).
     def gap_color(gap):
+        """Color the gap label by severity (green/orange/red)."""
         if gap < 0.05:
             return "#2ca02c"
         if gap <= 0.10:

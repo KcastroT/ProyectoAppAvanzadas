@@ -1,3 +1,10 @@
+"""Text preprocessing: encoding repair (ftfy), cleaning, slang and stemming.
+
+Provides an aggressive pipeline (``clean_text``: lowercase + stemming, for
+TF-IDF) and a lighter one (``clean_text_light``: keeps case/accents, for the
+cased BETO model and the LLMs).
+"""
+
 import re
 from typing import Dict
 import ftfy
@@ -100,18 +107,22 @@ def fix_dataframe_encoding(df: pd.DataFrame) -> pd.DataFrame:
 # =========================
 
 def remove_urls(text: str) -> str:
+    """Strip URLs (``http…``/``www…``) from the text."""
     return re.sub(r"http\S+|www\S+", "", text)
 
 
 def remove_mentions(text: str) -> str:
+    """Strip ``@user`` mentions from the text."""
     return re.sub(r"@\w+", "", text)
 
 
 def normalize_hashtags(text: str) -> str:
+    """Drop the ``#`` symbol, keeping the hashtag word (``#salud`` -> ``salud``)."""
     return re.sub(r"#(\w+)", r"\1", text)
 
 
 def normalize_whitespace(text: str) -> str:
+    """Collapse runs of whitespace into single spaces and trim the ends."""
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -129,6 +140,7 @@ def apply_stemming(text: str) -> str:
 
 
 def expand_slang(text: str, slang_map: Dict[str, str]) -> str:
+    """Replace each token with its expansion from ``slang_map`` (case-insensitive)."""
     words = text.split()
 
     normalized_words = []

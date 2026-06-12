@@ -1,3 +1,6 @@
+"""Persist DataFrames to disk (UTF-8 with BOM for spreadsheet compatibility)."""
+
+
 def save_dataframe(df, file_path):
     """Save a pandas DataFrame to a CSV file using UTF-8 encoding with BOM.
 

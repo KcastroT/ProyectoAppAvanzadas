@@ -1,3 +1,5 @@
+"""TF-IDF vectorizer for the classic models."""
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 

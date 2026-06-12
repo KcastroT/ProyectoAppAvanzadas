@@ -58,6 +58,7 @@ CONTROL_COLOR = "#1f77b4"
 
 
 def prepare(df):
+    """Fix encoding and add the cleaned + lightly-cleaned text columns."""
     df = fix_dataframe_encoding(df)
     df = add_clean_text_column(df, source_column=TEXT_COLUMN, target_column=CLEAN_TEXT_COLUMN)
     df = add_clean_text_column(
@@ -72,6 +73,7 @@ def prepare(df):
 # =========================
 
 def plot_class_distribution(train_df):
+    """Bar chart of the anorexia/control class balance in the training set."""
     counts = train_df[LABEL_COLUMN].value_counts()
     labels = list(counts.index)
     values = counts.values
@@ -106,6 +108,7 @@ def plot_class_distribution(train_df):
 # =========================
 
 def plot_tweet_length(train_df):
+    """Overlaid histograms of tweet length (in words) per class."""
     lengths = train_df[TEXT_COLUMN].astype(str).str.split().str.len()
     y = train_df[LABEL_COLUMN].to_numpy()
 
@@ -139,6 +142,7 @@ def plot_tweet_length(train_df):
 # =========================
 
 def plot_discriminative_terms(train_df, top_n=15):
+    """Horizontal bars of the most class-distinctive words by log-odds ratio."""
     texts = train_df[TRANSFORMER_TEXT_COLUMN].astype(str).to_numpy()
     y = train_df[LABEL_COLUMN].to_numpy()
 
@@ -199,10 +203,12 @@ LABELS = ["anorexia", "control"]
 
 
 def slug(name):
+    """Filesystem-safe slug for a model name."""
     return name.lower().replace(" + ", "_").replace(" ", "").replace("-", "")
 
 
 def build_classifier(features, clf_name):
+    """Build the grid pipeline for a (representation, classifier) pair."""
     if clf_name == "RandomForest":
         clf = build_rf()
     elif clf_name == "LinearSVC":
@@ -220,6 +226,7 @@ def build_classifier(features, clf_name):
 
 
 def _draw_cm(y_test, y_pred, ax, title):
+    """Draw one confusion matrix (counts) onto the given axes."""
     ConfusionMatrixDisplay.from_predictions(
         y_test, y_pred, display_labels=LABELS, labels=LABELS,
         cmap="Blues", colorbar=False, ax=ax,
@@ -230,6 +237,7 @@ def _draw_cm(y_test, y_pred, ax, title):
 
 
 def plot_confusion_matrices(train_df, test_df):
+    """Fit each of the 6 models and save its test confusion matrix + a 2x3 grid."""
     y_train = train_df[LABEL_COLUMN].to_numpy()
     y_test = test_df[LABEL_COLUMN].to_numpy()
 
@@ -285,6 +293,7 @@ def plot_confusion_matrices(train_df, test_df):
 
 
 def main():
+    """Generate the EDA figures and the per-model confusion matrices."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     print("Loading data ...")

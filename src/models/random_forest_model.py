@@ -1,3 +1,5 @@
+"""Random Forest classifier for the TF-IDF / BETO grid."""
+
 from sklearn.ensemble import RandomForestClassifier
 
 from config import RANDOM_STATE, RF_N_ESTIMATORS

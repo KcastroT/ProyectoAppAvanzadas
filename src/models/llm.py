@@ -16,7 +16,7 @@ Python standard library, so it adds no extra dependencies. Make sure Ollama is
 running and the model is pulled::
 
     ollama pull llama3.2:3b
-    ollama serve   # usually already running as a background service
+    ollama serve
 """
 
 import json
@@ -175,6 +175,7 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
         return examples
 
     def _truncate(self, text):
+        """Collapse whitespace and cap the text at ``max_chars`` characters."""
         text = " ".join(text.split())
 
         if len(text) > self.max_chars:
@@ -183,6 +184,7 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
         return text
 
     def _build_messages(self, text):
+        """Build the chat messages: system prompt, few-shot turns, then the tweet."""
         label_list = ", ".join(f'"{c}"' for c in self.classes_)
 
         system = (
@@ -223,6 +225,7 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
     # =========================
 
     def _classify_one(self, text):
+        """Query the LLM for one tweet; return (label, prob), fallback on error."""
         payload = {
             "model": self.model_name,
             "messages": self._build_messages(text),
@@ -245,6 +248,7 @@ class OllamaClassifier(BaseEstimator, ClassifierMixin):
             return fallback, self._prob_from_label(fallback)
 
     def _post_chat(self, payload):
+        """POST the payload to Ollama's /api/chat and return the message content."""
         data = json.dumps(payload).encode("utf-8")
 
         request = urllib.request.Request(

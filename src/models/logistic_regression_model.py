@@ -1,3 +1,5 @@
+"""Logistic Regression classifier for the TF-IDF / BETO grid."""
+
 from sklearn.linear_model import LogisticRegression
 
 from config import LR_C, LR_MAX_ITER, RANDOM_STATE

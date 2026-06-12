@@ -369,8 +369,6 @@ def main():
             (
                 "BETO",
                 "LinearSVC",
-                # BETO embeddings want heavier regularization than TF-IDF
-                # (tuned by 5-fold CV): C=0.01 instead of the default 1.0.
                 make_pipeline(StandardScaler(), build_svm_model(C=SVM_C_BETO)),
                 X_train_beto,
                 X_validation_beto,
@@ -437,8 +435,6 @@ def main():
         return
 
     if FEATURE_METHOD == "beto_finetune":
-        # No external feature extractor: the classifier consumes raw text
-        # and updates its own representations end-to-end.
         X_train_features = X_train
 
         X_validation_features = X_validation

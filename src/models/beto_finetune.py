@@ -53,7 +53,7 @@ class _TextDataset(Dataset):
 
 
 class BetoClassifier(BaseEstimator, ClassifierMixin):
-    """Fine-tune BETO with a classification head, sklearn-style."""
+    """Fine-tune BETO with a classification head."""
 
     def __init__(
         self,
@@ -84,6 +84,7 @@ class BetoClassifier(BaseEstimator, ClassifierMixin):
     # ------------------------------------------------------------------
 
     def fit(self, X, y):
+        """Fine-tune BETO end-to-end on the texts ``X`` with labels ``y``."""
         set_seed(self.seed)
 
         self.tokenizer_ = AutoTokenizer.from_pretrained(self.model_name)
@@ -154,6 +155,7 @@ class BetoClassifier(BaseEstimator, ClassifierMixin):
 
     @torch.no_grad()
     def _logits(self, X):
+        """Run the fine-tuned model in batches and return the raw logits."""
         texts = [str(t) for t in X]
 
         device = next(self.model_.parameters()).device
@@ -178,6 +180,7 @@ class BetoClassifier(BaseEstimator, ClassifierMixin):
         return np.vstack(all_logits)
 
     def predict(self, X):
+        """Predict the class label (argmax of the logits) for each text."""
         logits = self._logits(X)
 
         predicted_indices = logits.argmax(axis=1)
@@ -187,6 +190,7 @@ class BetoClassifier(BaseEstimator, ClassifierMixin):
         )
 
     def predict_proba(self, X):
+        """Return class probabilities (softmax over the logits) per text."""
         logits = self._logits(X)
 
         shifted = logits - logits.max(axis=1, keepdims=True)

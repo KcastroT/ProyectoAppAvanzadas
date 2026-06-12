@@ -1,9 +1,5 @@
 """Generalization diagnostics for the six classical models.
 
-Everything here is grounded in **stratified 5-fold cross-validation** over the
-full training set, using **weighted F1** (not accuracy) to avoid being misled
-by class imbalance. No single train/test split is used as a quality signal.
-
 Deliverables (run from ``src/``: ``python plot_classical_errors.py``):
 
   1. Main comparison — mean CV F1 per model with std error bars, sorted
@@ -217,6 +213,7 @@ def _take(X, idx):
 
 
 def main():
+    """Run the CV diagnostics and write all classical-model figures."""
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # =========================
@@ -226,6 +223,7 @@ def main():
     print("Loading and preprocessing data ...")
 
     def prepare(df):
+        """Fix encoding and add the cleaned + lightly-cleaned text columns."""
         df = fix_dataframe_encoding(df)
         df = add_clean_text_column(
             df, source_column=TEXT_COLUMN, target_column=CLEAN_TEXT_COLUMN
@@ -267,9 +265,11 @@ def main():
     print(f"  BETO shape: train {X_beto.shape}, test {X_test_beto.shape}")
 
     def get_X(features):
+        """Training features for a representation (raw text or BETO embeddings)."""
         return X_text if features == "TF-IDF" else X_beto
 
     def get_X_test(features):
+        """Test features for a representation (raw text or BETO embeddings)."""
         return X_test_text if features == "TF-IDF" else X_test_beto
 
     # =========================

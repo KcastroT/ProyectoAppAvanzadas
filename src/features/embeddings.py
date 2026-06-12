@@ -1,13 +1,7 @@
 """BETO (Spanish BERT) sentence embeddings as a feature extractor.
 
-This module wraps a pretrained BETO model so it can be used as a drop-in
-alternative to TF-IDF: each text is encoded into a single dense vector by
-mean-pooling the last hidden states (masking out padding tokens).
 
-The model is used in inference mode only (no fine-tuning), which makes it a
-lightweight upgrade path from classic bag-of-words features toward
-transformer-based representations, while still feeding a classic classifier
-such as LinearSVC.
+The model is used in inference mode only (no fine-tuning).
 """
 
 import numpy as np
