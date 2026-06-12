@@ -42,13 +42,11 @@ La pregunta central: *¿qué generaliza mejor a datos no vistos, y a qué costo?
 ```
 src/
   config.py              # configuración central (switch FEATURE_METHOD, hiperparámetros)
-  main.py                # orquestador: corre el flujo según FEATURE_METHOD
+  main.py                # orquestador: corre el flujo según FEATURE_METHOD; en "grid" genera las curvas ROC
   data/                  # carga, reparación de codificación, limpieza, guardado
   features/              # vectorizer (TF-IDF char_wb) · embeddings (BETO mean-pooled)
   models/                # svm · random_forest · logistic_regression · beto_finetune · llm (Ollama)
-  evaluation/            # metrics · compare (tablas) · predictions · plots
-  plot_classical_errors.py  # diagnósticos por CV + figuras (comparación, sobreajuste, ROC/AUC)
-  plot_eda.py            # EDA (clases, longitud, términos) + matrices de confusión
+  evaluation/            # metrics · compare (tablas) · predictions · plots (helpers de figuras)
 tests/                   # 61 pruebas unitarias (unittest)
 reports/figures/         # figuras generadas
 data/raw/                # datasets
@@ -93,9 +91,7 @@ El flujo se controla con `FEATURE_METHOD` en `src/config.py`:
 
 ```bash
 cd src
-python main.py                 # corre el flujo seleccionado en config.py
-python plot_classical_errors.py  # figuras de diagnóstico de los clásicos
-python plot_eda.py             # figuras de EDA + matrices de confusión
+python main.py                 # corre el flujo seleccionado; en "grid" genera las curvas ROC
 python -m unittest discover -s ../tests   # 61 pruebas
 ```
 

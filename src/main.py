@@ -15,6 +15,8 @@ The current implementation uses:
 - Linear SVM for classification
 """
 
+from pathlib import Path
+
 import numpy as np
 
 # config.py
@@ -87,10 +89,11 @@ from features.embeddings import (
 
 from sklearn.model_selection import (
     train_test_split,
-    cross_val_score
+    cross_val_score,
+    StratifiedKFold,
 )
 
-from sklearn.pipeline import make_pipeline
+from sklearn.pipeline import make_pipeline, Pipeline
 
 from sklearn.preprocessing import StandardScaler
 
@@ -121,14 +124,16 @@ from evaluation.compare import (
     run_full_evaluation,
 )
 
-
+from evaluation.plots import save_roc_cv_test
 
 
 from sklearn.metrics import (
     accuracy_score,
+    auc,
     classification_report,
     confusion_matrix,
     f1_score,
+    roc_curve,
 )
 
 def train_model(model, X_train, y_train):
@@ -145,6 +150,180 @@ def train_model(model, X_train, y_train):
     model.fit(X_train, y_train)
 
     return model
+
+
+# =========================
+# ROC / AUC figures (classical grid)
+# =========================
+
+# Where the ROC PNGs are written (relative to src/, like the other paths).
+ROC_OUTPUT_DIR = Path("../reports/figures")
+
+# Class treated as "positive" for ROC/AUC (the condition to detect).
+ROC_POS_LABEL = "anorexia"
+
+# (display name, representation, classifier kind) for each grid cell.
+ROC_MODELS = [
+    ("TF-IDF + LinearSVC", "TF-IDF", "svm"),
+    ("TF-IDF + RandomForest", "TF-IDF", "rf"),
+    ("TF-IDF + LogisticReg", "TF-IDF", "lr"),
+    ("BETO + LinearSVC", "BETO", "svm"),
+    ("BETO + RandomForest", "BETO", "rf"),
+    ("BETO + LogisticReg", "BETO", "lr"),
+]
+
+
+def _roc_estimator(kind, features):
+    """Fresh classifier for a grid cell.
+
+    Only TF-IDF + LinearSVC uses the tuned ``SVM_C`` (the "Optimizado" cell);
+    every other SVM cell uses ``SVM_C_BETO``. RandomForest / LogisticRegression
+    have no SVM C.
+    """
+    if kind == "svm":
+        return (
+            build_svm_model()  # default C = SVM_C
+            if features == "TF-IDF"
+            else build_svm_model(C=SVM_C_BETO)
+        )
+
+    if kind == "rf":
+        return build_rf_model()
+
+    return build_lr_model()
+
+
+def _roc_pipeline(features, kind):
+    """Pipeline that re-vectorizes (TF-IDF) or scales (BETO) inside each fold.
+
+    Building the vectorizer/scaler inside the pipeline keeps the CV folds
+    leakage-free (refit on each fold's training rows only).
+    """
+    steps = []
+
+    if features == "TF-IDF":
+        steps.append(("tfidf", build_vectorizer()))
+    elif kind in ("svm", "lr"):
+        steps.append(("scaler", StandardScaler()))
+
+    steps.append(("clf", _roc_estimator(kind, features)))
+
+    return Pipeline(steps)
+
+
+def _roc_slug(name):
+    """Filesystem-safe slug for a model name."""
+    return name.lower().replace(" + ", "_").replace(" ", "").replace("-", "")
+
+
+def _roc_positive_scores(fitted, X):
+    """Continuous score for ROC_POS_LABEL (decision_function or predict_proba).
+
+    LinearSVC's decision_function is signed toward classes_[1], so flip it when
+    the positive label is classes_[0]; tree/linear models expose predict_proba.
+    """
+    classes = list(fitted.classes_)
+
+    if hasattr(fitted, "decision_function"):
+        score = fitted.decision_function(X)
+        return score if ROC_POS_LABEL == classes[1] else -score
+
+    proba = fitted.predict_proba(X)
+    return proba[:, classes.index(ROC_POS_LABEL)]
+
+
+def _roc_cv_and_test(features, kind, X_tr, y_tr, X_te, y_te):
+    """Per-fold CV ROC (mean ±std) + external-test ROC for one grid cell."""
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+
+    mean_fpr = np.linspace(0.0, 1.0, 100)
+    tprs = []
+    aucs = []
+
+    for train_idx, val_idx in cv.split(X_tr, y_tr):
+        pipe = _roc_pipeline(features, kind)
+        pipe.fit(X_tr[train_idx], y_tr[train_idx])
+
+        scores = _roc_positive_scores(pipe, X_tr[val_idx])
+        fpr, tpr, _ = roc_curve(y_tr[val_idx], scores, pos_label=ROC_POS_LABEL)
+
+        interp_tpr = np.interp(mean_fpr, fpr, tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(auc(fpr, tpr))
+
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+
+    # External test: fit on the full (80%) training split, score once on test.
+    pipe = _roc_pipeline(features, kind)
+    pipe.fit(X_tr, y_tr)
+    test_scores = _roc_positive_scores(pipe, X_te)
+    test_fpr, test_tpr, _ = roc_curve(y_te, test_scores, pos_label=ROC_POS_LABEL)
+
+    return {
+        "mean_fpr": mean_fpr,
+        "mean_tpr": mean_tpr,
+        "std_tpr": np.std(tprs, axis=0),
+        "cv_auc_mean": float(np.mean(aucs)),
+        "cv_auc_std": float(np.std(aucs)),
+        "test_fpr": test_fpr,
+        "test_tpr": test_tpr,
+        "test_auc": float(auc(test_fpr, test_tpr)),
+    }
+
+
+def plot_roc_figures(
+    X_train_text,
+    X_test_text,
+    X_train_beto,
+    X_test_beto,
+    y_train,
+    y_test,
+):
+    """Write the six ROC curves (CV mean ±std + external test) for the grid.
+
+    Reuses the BETO embeddings already computed for the grid; TF-IDF cells
+    re-vectorize raw text inside each fold (no leakage). The external-test AUC
+    matches the grid's reported Test AUC (same 80% fit, same external test).
+    SVM cells are flagged "(Optimizado)" because they use a CV-tuned C.
+    """
+    ROC_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    y_tr = np.asarray(y_train)
+    y_te = np.asarray(y_test)
+
+    print(f"\n=== ROC / AUC figures (positive class = {ROC_POS_LABEL}) ===")
+
+    for name, features, kind in ROC_MODELS:
+        if features == "TF-IDF":
+            X_tr, X_te = X_train_text, X_test_text
+        else:
+            X_tr, X_te = X_train_beto, X_test_beto
+
+        roc = _roc_cv_and_test(features, kind, X_tr, y_tr, X_te, y_te)
+
+        # Each SVM cell is labeled "(Optimizado)" when its own C was tuned below
+        # the sklearn default of 1.0 (TF-IDF uses SVM_C, BETO uses SVM_C_BETO).
+        if kind == "svm" and _roc_estimator(kind, features).C < 1:
+            title = f"{name} (Optimizado)"
+        else:
+            title = name
+
+        save_roc_cv_test(
+            roc["mean_fpr"], roc["mean_tpr"], roc["std_tpr"],
+            roc["cv_auc_mean"], roc["cv_auc_std"],
+            roc["test_fpr"], roc["test_tpr"], roc["test_auc"],
+            ROC_OUTPUT_DIR / f"roc_{_roc_slug(name)}.png", title,
+            pos_label=ROC_POS_LABEL,
+        )
+
+        print(
+            f"  {name:<24} AUC_cv={roc['cv_auc_mean']:.3f}±"
+            f"{roc['cv_auc_std']:.3f}  AUC_test={roc['test_auc']:.3f}"
+        )
+
+    print(f"-> {ROC_OUTPUT_DIR}  (6 curvas ROC)")
 
 
 def main():
@@ -430,6 +609,17 @@ def main():
             grid_results,
             split="test",
             title="External test metrics (weighted)",
+        )
+
+        # ROC / AUC curves (CV mean ±std + external test) per grid cell.
+        # Reuses the BETO embeddings above; TF-IDF cells re-vectorize per fold.
+        plot_roc_figures(
+            X_train_text=train_df_split[CLEAN_TEXT_COLUMN].to_numpy(dtype=object),
+            X_test_text=test_df[CLEAN_TEXT_COLUMN].to_numpy(dtype=object),
+            X_train_beto=X_train_beto,
+            X_test_beto=X_test_beto,
+            y_train=y_train,
+            y_test=y_test,
         )
 
         return
