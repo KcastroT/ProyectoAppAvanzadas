@@ -378,11 +378,14 @@ def main():
         auc_cv_std.append(roc["cv_auc_std"])
         auc_test.append(roc["test_auc"])
 
+        # The SVM (LinearSVC) cells use a CV-tuned C, so flag them as optimized.
+        roc_title = f"{name} (Optimizado)" if kind == "svm" else name
+
         save_roc_cv_test(
             roc["mean_fpr"], roc["mean_tpr"], roc["std_tpr"],
             roc["cv_auc_mean"], roc["cv_auc_std"],
             roc["test_fpr"], roc["test_tpr"], roc["test_auc"],
-            OUTPUT_DIR / f"roc_{slug(name)}.png", name, pos_label=POS_LABEL,
+            OUTPUT_DIR / f"roc_{slug(name)}.png", roc_title, pos_label=POS_LABEL,
         )
 
         print(
