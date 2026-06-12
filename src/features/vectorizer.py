@@ -10,7 +10,6 @@ def build_vectorizer():
         ngram_range=(2,5),
         min_df=3,
         sublinear_tf=True,
-        lowercase=True,
         strip_accents="unicode",
     )
 
